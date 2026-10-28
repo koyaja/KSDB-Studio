@@ -176,6 +176,18 @@ export class Store {
     return g ? this.groups()[g]?.vpnId : undefined;
   }
 
+  // ---- Positions des tables dans les diagrammes ERD ----
+  erdLayout(key: string): unknown {
+    return readJson<Record<string, unknown>>('erd-layouts.json', {})[key] ?? null;
+  }
+
+  saveErdLayout(key: string, layout: unknown) {
+    const all = readJson<Record<string, unknown>>('erd-layouts.json', {});
+    if (layout === null) delete all[key];
+    else all[key] = layout;
+    writeJson('erd-layouts.json', all);
+  }
+
   // ---- Paramètres ----
   settings(): Settings {
     return {

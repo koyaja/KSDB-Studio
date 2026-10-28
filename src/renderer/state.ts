@@ -11,6 +11,7 @@ export type Tab =
   | { id: string; kind: 'backup'; connectionId: string; database: string; mode: 'dump' | 'restore'; tables?: string[] }
   | { id: string; kind: 'import'; connectionId: string; database: string; schema: string; table: string }
   | { id: string; kind: 'processes'; connectionId: string }
+  | { id: string; kind: 'erd'; connectionId: string; database: string; schema: string }
   | { id: string; kind: 'history' }
   | { id: string; kind: 'settings' };
 
@@ -190,6 +191,10 @@ function sameTarget(a: Tab, b: Tab): boolean {
     }
     case 'processes':
       return a.connectionId === (b as typeof a).connectionId;
+    case 'erd': {
+      const bb = b as typeof a;
+      return a.connectionId === bb.connectionId && a.database === bb.database && a.schema === bb.schema;
+    }
     case 'history':
     case 'settings':
       return true;

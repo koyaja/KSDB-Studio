@@ -1,6 +1,7 @@
 import type {
   CellValue,
   DbKind,
+  ErdModel,
   DbObject,
   ObjectType,
   ProcessInfo,
@@ -45,6 +46,8 @@ export interface Driver {
   structure(db: string, schema: string, table: string): Promise<TableStructure>;
   ddl(db: string, schema: string, name: string, type: ObjectType, extra?: string): Promise<string>;
   completion(db: string): Promise<CompletionSchema>;
+  /** Modèle complet d'un schéma pour le diagramme ERD (requêtes groupées). */
+  erdModel(db: string, schema: string): Promise<ErdModel>;
 
   /** Exécute un script dans une session dédiée (onglet de requête). */
   execute(sessionId: string, db: string, statements: string[], maxRows: number): Promise<QueryResult[]>;

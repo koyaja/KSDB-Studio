@@ -14,6 +14,7 @@ import {
   Hash,
   Layers,
   Loader2,
+  Network,
   Pencil,
   Plug,
   Plus,
@@ -392,6 +393,7 @@ function DatabaseNode({ conn, db }: { conn: ListedConnection; db: string }) {
   const menu = (e: React.MouseEvent) =>
     openMenu(e, [
       { label: 'Nouvelle requête', icon: <FileCode />, onClick: () => newQueryTab(conn.id, db) },
+      ...(isMy ? [{ label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema: db }) }] : []),
       ...(isMy ? [{ label: 'Nouvelle table', icon: <FilePlus2 />, onClick: () => openTab({ id: uid(), kind: 'designer', connectionId: conn.id, database: db, schema: db, table: null }) }] : []),
       ...(!isMy
         ? [
@@ -461,6 +463,7 @@ function SchemaNode({ conn, db, schema }: { conn: ListedConnection; db: string; 
   const menu = (e: React.MouseEvent) =>
     openMenu(e, [
       { label: 'Nouvelle requête', icon: <FileCode />, onClick: () => newQueryTab(conn.id, db, `SET search_path TO ${quoteIdent('postgres', schema)};\n\n`) },
+      { label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema }) },
       { label: 'Nouvelle table', icon: <FilePlus2 />, onClick: () => openTab({ id: uid(), kind: 'designer', connectionId: conn.id, database: db, schema, table: null }) },
       { label: 'Actualiser', icon: <RefreshCw />, onClick: () => bumpTree(key) },
       { label: 'Copier le nom', icon: <Copy />, onClick: () => copyText(schema) },

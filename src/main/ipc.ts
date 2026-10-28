@@ -101,6 +101,7 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
     return r.canceled ? null : r.filePath ?? null;
   });
   handle('app:readText', (p: string) => fs.promises.readFile(p, 'utf8'));
+  handle('app:writeBase64', (p: string, b64: string) => fs.promises.writeFile(p, Buffer.from(b64, 'base64')));
   handle('app:writeText', (p: string, content: string) => fs.promises.writeFile(p, content, 'utf8'));
   handle('app:openExternal', (url: string) => (/^https?:\/\//.test(url) ? shell.openExternal(url) : undefined));
   handle('app:showItem', (p: string) => shell.showItemInFolder(p));
@@ -260,6 +261,9 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
   handle('db:ddl', async (id: string, db: string, schema: string, name: string, type: ObjectType, extra?: string) =>
     (await cm.get(id)).ddl(db, schema, name, type, extra),
   );
+  handle('db:erd', async (id: string, db: string, schema: string) => (await cm.get(id)).erdModel(db, schema));
+  handle('app:erdLayout', (key: string) => store.erdLayout(key));
+  handle('app:saveErdLayout', (key: string, layout: unknown) => store.saveErdLayout(key, layout));
   handle('db:completion', async (id: string, db: string) => (await cm.get(id)).completion(db));
 
   // ---------- Requêtes ----------

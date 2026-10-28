@@ -1646,3 +1646,28 @@ table.designer tr.isnew td:first-child {
   font-size: 11.5px;
   line-height: 1.35;
 }
+
+/* ---------- Diagramme ERD ---------- */
+.erd-host {
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  overflow: hidden;
+  cursor: grab;
+  background-color: var(--bg);
+  background-image: radial-gradient(var(--line) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+.erd-host:active {
+  cursor: grabbing;
+}
+.erd-svg {
+  display: block;
+  user-select: none;
+}
+.erd-table {
+  cursor: move;
+}
+.erd-edges g {
+  cursor: help;
+}

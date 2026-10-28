@@ -148,6 +148,23 @@ async function main() {
         assert.equal(st.foreignKeys[0].refTable, 'clients');
         assert.equal(st.foreignKeys[0].onDelete, 'CASCADE');
       });
+      await t('modèle ERD (tables, PK, FK)', async () => {
+        const m = await d.erdModel(db, schema);
+        const cl = m.tables.find((x) => x.name === 'clients')!;
+        assert.ok(cl, 'table clients');
+        assert.ok(cl.columns.find((c) => c.name === 'id')!.pk);
+        assert.ok(m.tables.some((x) => x.kind === 'view'));
+        if (cfg.kind === 'mysql') {
+          const r = m.relations.find((x) => x.from === 'commandes')!;
+          assert.deepEqual([r.to, r.fromColumns[0], r.toColumns[0], r.onDelete], ['clients', 'client_id', 'id', 'CASCADE']);
+          assert.ok(m.tables.find((x) => x.name === 'commandes')!.columns.find((c) => c.name === 'client_id')!.fk);
+        } else {
+          const v = await d.erdModel(db, 'ventes');
+          const r = v.relations[0];
+          assert.deepEqual([r.from, r.toSchema, r.to, r.onDelete], ['commandes', 'public', 'clients', 'CASCADE']);
+          assert.ok(v.tables[0].columns.find((c) => c.name === 'client_id')!.fk);
+        }
+      });
       await t('DDL table / vue / fonction / trigger', async () => {
         const t1 = await d.ddl(db, schema, 'clients', 'table');
         assert.match(t1, /CREATE TABLE/i);

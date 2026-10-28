@@ -22,12 +22,12 @@ Lance `KSDB-Studio-Setup-<version>.exe`. L’application n’est pas signée : W
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./KSDB-Studio-1.2.0-linux-amd64.deb
+sudo apt install ./KSDB-Studio-1.3.0-linux-amd64.deb
 ksdb-studio
 
 # AppImage (toutes distributions)
-chmod +x KSDB-Studio-1.2.0-linux-x86_64.AppImage
-./KSDB-Studio-1.2.0-linux-x86_64.AppImage
+chmod +x KSDB-Studio-1.3.0-linux-x86_64.AppImage
+./KSDB-Studio-1.3.0-linux-x86_64.AppImage
 # Ubuntu 22.04+ : sudo apt install libfuse2t64   (ou libfuse2)
 # Erreur « sandbox » sur Ubuntu 24.04 : ajouter --no-sandbox
 ```
@@ -43,6 +43,7 @@ chmod +x KSDB-Studio-1.2.0-linux-x86_64.AppImage
 | Éditeur SQL | Onglets restaurés au redémarrage ; **autocomplétion des tables et colonnes** ; exécution de l’instruction courante (Ctrl+Entrée) ou du script (F5) ; sessions persistantes (BEGIN / COMMIT sur plusieurs exécutions) ; **annulation** ; EXPLAIN / EXPLAIN ANALYZE ; formatage ; fichiers `.sql` ; historique |
 | Données | Grille virtualisée ; pagination ; tri multi-colonnes ; filtre WHERE ; **édition directe** ; ajout / suppression de lignes ; aperçu du SQL ; enregistrement **dans une transaction** ; copie TSV ou INSERT ; éditeur de valeur (JSON formaté) |
 | Structure | Colonnes, index, clés étrangères, DDL ; **concepteur de table** (création et modification) avec le SQL généré visible |
+| Diagramme ERD | Diagramme automatique d’un schéma (tables, colonnes, PK/FK, nombre de lignes, relations en pattes de corbeau) ; zoom, déplacement, tables repositionnables (positions mémorisées) ; clic pour mettre en évidence les relations ; recherche ; affichage complet / clés / noms ; requête avec jointures générée ; export **PNG** et **SVG** |
 | Import / export | Export de table complète en CSV, TSV, JSON, SQL INSERT ; export des résultats ; **import CSV** (séparateur détecté, encodage, correspondance des colonnes, transaction unique) |
 | Sauvegarde | **Dump / restauration** via pg_dump, pg_restore, psql, mysqldump, mysql (détectés automatiquement), y compris à travers un tunnel SSH ou un VPN |
 | Serveur | Sessions actives, annulation de requête, fin de session |
@@ -52,6 +53,7 @@ chmod +x KSDB-Studio-1.2.0-linux-x86_64.AppImage
 |---|---|
 | ![Données, thème Papier](docs/screenshots/donnees-papier.png) | ![VPN associé à un groupe](docs/screenshots/vpn-groupe.png) |
 | ![Concepteur de table](docs/screenshots/concepteur.png) | ![Sauvegarde avec pg_dump](docs/screenshots/sauvegarde.png) |
+| ![Diagramme ERD](docs/screenshots/erd.png) | ![Diagramme ERD, relations en évidence](docs/screenshots/erd-selection.png) |
 
 ## Migrer depuis Navicat
 
@@ -117,7 +119,6 @@ Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studi
 
 ## Feuille de route
 
-- Diagramme ERD
 - Comparaison et synchronisation de schémas
 - Transfert de données entre serveurs
 - Gestion des utilisateurs et des droits

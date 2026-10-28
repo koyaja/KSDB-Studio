@@ -6,6 +6,9 @@ import type {
   ColumnInfo,
   ConnectionConfig,
   DbObject,
+  ErdColumn,
+  ErdModel,
+  ErdRelation,
   ForeignKeyInfo,
   IndexInfo,
   ObjectType,
@@ -269,6 +272,63 @@ export class MysqlDriver implements Driver {
     const [r] = await this.q<Row>(undefined, `SHOW CREATE ${kw} ${q}`);
     const text = String(r?.[col] ?? Object.values(r ?? {})[1] ?? '');
     return text.trim() + ';\n';
+  }
+
+  async erdModel(db: string): Promise<ErdModel> {
+    const [tables, cols, fks] = await Promise.all([
+      this.q<{ n: string; t: string; r: number | null; c: string }>(
+        undefined,
+        `SELECT TABLE_NAME n, TABLE_TYPE t, TABLE_ROWS r, TABLE_COMMENT c FROM information_schema.TABLES
+         WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME`,
+        [db],
+      ),
+      this.q<{ t: string; n: string; ty: string; nl: string; k: string }>(
+        undefined,
+        `SELECT TABLE_NAME t, COLUMN_NAME n, COLUMN_TYPE ty, IS_NULLABLE nl, COLUMN_KEY k FROM information_schema.COLUMNS
+         WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME, ORDINAL_POSITION`,
+        [db],
+      ),
+      this.q<{ name: string; t: string; c: string; rs: string; rt: string; rc: string; del: string }>(
+        undefined,
+        `SELECT k.CONSTRAINT_NAME name, k.TABLE_NAME t, k.COLUMN_NAME c, k.REFERENCED_TABLE_SCHEMA rs,
+                k.REFERENCED_TABLE_NAME rt, k.REFERENCED_COLUMN_NAME rc, r.DELETE_RULE del
+         FROM information_schema.KEY_COLUMN_USAGE k
+         JOIN information_schema.REFERENTIAL_CONSTRAINTS r
+           ON r.CONSTRAINT_SCHEMA = k.CONSTRAINT_SCHEMA AND r.CONSTRAINT_NAME = k.CONSTRAINT_NAME AND r.TABLE_NAME = k.TABLE_NAME
+         WHERE k.TABLE_SCHEMA = ? AND k.REFERENCED_TABLE_NAME IS NOT NULL
+         ORDER BY k.TABLE_NAME, k.CONSTRAINT_NAME, k.ORDINAL_POSITION`,
+        [db],
+      ),
+    ]);
+    const relMap = new Map<string, ErdRelation>();
+    for (const f of fks) {
+      const key = `${f.t}\u0000${f.name}`;
+      let r = relMap.get(key);
+      if (!r) relMap.set(key, (r = { name: f.name, from: f.t, fromColumns: [], toSchema: f.rs, to: f.rt, toColumns: [], onDelete: f.del }));
+      r.fromColumns.push(f.c);
+      r.toColumns.push(f.rc);
+    }
+    const fkSet = new Set(fks.map((f) => `${f.t}\u0000${f.c}`));
+    const byTable = new Map<string, ErdColumn[]>();
+    for (const c of cols)
+      (byTable.get(c.t) ?? byTable.set(c.t, []).get(c.t)!).push({
+        name: c.n,
+        type: c.ty,
+        nullable: c.nl === 'YES',
+        pk: c.k === 'PRI',
+        fk: fkSet.has(`${c.t}\u0000${c.n}`),
+      });
+    return {
+      schema: db,
+      tables: tables.map((t) => ({
+        name: t.n,
+        kind: /VIEW/i.test(t.t) ? 'view' : 'table',
+        rows: t.r === null || t.r === undefined ? null : Number(t.r),
+        comment: t.c || null,
+        columns: byTable.get(t.n) ?? [],
+      })),
+      relations: [...relMap.values()],
+    };
   }
 
   async completion(db: string): Promise<CompletionSchema> {

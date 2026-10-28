@@ -25,6 +25,7 @@ import type {
   TableStructure,
   ToolStatus,
   GroupSettings,
+  ErdModel,
   VpnBackendInfo,
   VpnProfile,
   VpnStatus,
@@ -120,6 +121,10 @@ export const api = {
   structure: (id: string, db: string, schema: string, table: string) => call<TableStructure>('db:structure', id, db, schema, table),
   ddl: (id: string, db: string, schema: string, name: string, type: ObjectType, extra?: string) =>
     call<string>('db:ddl', id, db, schema, name, type, extra),
+  erd: (id: string, db: string, schema: string) => call<ErdModel>('db:erd', id, db, schema),
+  erdLayout: (key: string) => call<unknown>('app:erdLayout', key),
+  saveErdLayout: (key: string, layout: unknown) => call<void>('app:saveErdLayout', key, layout),
+  writeBase64: (p: string, b64: string) => call<void>('app:writeBase64', p, b64),
   completion: (id: string, db: string) => call<Completion>('db:completion', id, db),
 
   execute: (id: string, sessionId: string, db: string, sql: string) => call<QueryResult[]>('db:execute', id, sessionId, db, sql),

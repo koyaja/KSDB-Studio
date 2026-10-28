@@ -301,3 +301,38 @@ export interface ToolStatus {
 }
 
 export type ApiResult<T> = { ok: true; data: T } | { ok: false; error: string };
+
+// ---------- Diagramme ERD ----------
+
+export interface ErdColumn {
+  name: string;
+  type: string;
+  nullable: boolean;
+  pk: boolean;
+  fk: boolean;
+}
+
+export interface ErdTable {
+  name: string;
+  kind: 'table' | 'view';
+  /** estimation du nombre de lignes */
+  rows: number | null;
+  comment: string | null;
+  columns: ErdColumn[];
+}
+
+export interface ErdRelation {
+  name: string;
+  from: string;
+  fromColumns: string[];
+  toSchema: string;
+  to: string;
+  toColumns: string[];
+  onDelete: string;
+}
+
+export interface ErdModel {
+  schema: string;
+  tables: ErdTable[];
+  relations: ErdRelation[];
+}

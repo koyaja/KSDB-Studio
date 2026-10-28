@@ -13,6 +13,7 @@ import {
   Shield,
   Clock3,
   Monitor,
+  Network,
   Sun,
   Table2,
   Upload,
@@ -30,6 +31,7 @@ import { DesignerTab } from './tabs/DesignerTab';
 import { ImportTab } from './tabs/ImportTab';
 import { HistoryTab, openSettings, ProcessesTab, SettingsTab } from './tabs/MiscTabs';
 import { QueryTab } from './tabs/QueryTab';
+import { ErdTab } from './tabs/ErdTab';
 import { TableTab } from './tabs/TableTab';
 import {
   closeTab,
@@ -64,6 +66,8 @@ function tabTitle(t: Tab): string {
       return `Import → ${t.table}`;
     case 'processes':
       return `Processus · ${connectionById(t.connectionId)?.name ?? ''}`;
+    case 'erd':
+      return `ERD ${t.schema !== t.database ? `${t.database}.${t.schema}` : t.database}`;
     case 'history':
       return 'Historique';
     case 'settings':
@@ -86,6 +90,8 @@ function tabIcon(t: Tab) {
       return <FileInput {...p} />;
     case 'processes':
       return <Activity {...p} />;
+    case 'erd':
+      return <Network {...p} style={{ color: 'var(--accent)' }} />;
     case 'history':
       return <History {...p} />;
     case 'settings':
@@ -313,6 +319,8 @@ export function App() {
                   return <BackupTab key={t.id} tab={t} active={active} />;
                 case 'import':
                   return <ImportTab key={t.id} tab={t} active={active} />;
+                case 'erd':
+                  return <ErdTab key={t.id} tab={t} active={active} />;
                 case 'processes':
                   return <ProcessesTab key={t.id} tab={t} active={active} />;
                 case 'history':

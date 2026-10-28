@@ -7,6 +7,8 @@ import type {
   ColumnInfo,
   ConnectionConfig,
   DbObject,
+  ErdColumn,
+  ErdModel,
   ForeignKeyInfo,
   IndexInfo,
   ObjectType,
@@ -353,6 +355,83 @@ export class PostgresDriver implements Driver {
     );
     for (const t of trg) out += `\n\n${t.d};`;
     return out.trim() + '\n';
+  }
+
+  async erdModel(db: string, schema: string): Promise<ErdModel> {
+    const FK = FK_ACTIONS;
+    const [rels, cols, pks, fks] = await Promise.all([
+      this.q<{ name: string; kind: string; rows: string | null; comment: string | null }>(
+        db,
+        `select c.relname as name, c.relkind::text as kind,
+                case when c.reltuples < 0 then null else c.reltuples::bigint end as rows,
+                obj_description(c.oid, 'pg_class') as comment
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = $1 and c.relkind in ('r','p','v','m') and not c.relispartition
+         order by 1`,
+        [schema],
+      ),
+      this.q<{ t: string; name: string; type: string; nullable: boolean }>(
+        db,
+        `select c.relname as t, a.attname as name, format_type(a.atttypid, a.atttypmod) as type, not a.attnotnull as nullable
+         from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = $1 and c.relkind in ('r','p','v','m') and a.attnum > 0 and not a.attisdropped
+         order by c.relname, a.attnum`,
+        [schema],
+      ),
+      this.q<{ t: string; col: string }>(
+        db,
+        `select c.relname as t, a.attname as col
+         from pg_constraint con join pg_class c on c.oid = con.conrelid join pg_namespace n on n.oid = c.relnamespace
+         join lateral unnest(con.conkey) k(num) on true
+         join pg_attribute a on a.attrelid = con.conrelid and a.attnum = k.num
+         where n.nspname = $1 and con.contype = 'p'`,
+        [schema],
+      ),
+      this.q<{ name: string; t: string; cols: string[]; rs: string; rt: string; rcols: string[]; del: string }>(
+        db,
+        `select con.conname as name, c.relname as t,
+                array(select a.attname from unnest(con.conkey) with ordinality k(n, o)
+                      join pg_attribute a on a.attrelid = con.conrelid and a.attnum = k.n order by k.o)::text[] as cols,
+                rn.nspname as rs, rc.relname as rt,
+                array(select a.attname from unnest(con.confkey) with ordinality k(n, o)
+                      join pg_attribute a on a.attrelid = con.confrelid and a.attnum = k.n order by k.o)::text[] as rcols,
+                con.confdeltype::text as del
+         from pg_constraint con join pg_class c on c.oid = con.conrelid join pg_namespace n on n.oid = c.relnamespace
+         join pg_class rc on rc.oid = con.confrelid join pg_namespace rn on rn.oid = rc.relnamespace
+         where n.nspname = $1 and con.contype = 'f' order by 2, 1`,
+        [schema],
+      ),
+    ]);
+    const pkSet = new Set(pks.map((p) => `${p.t}\u0000${p.col}`));
+    const fkSet = new Set(fks.flatMap((f) => f.cols.map((c) => `${f.t}\u0000${c}`)));
+    const byTable = new Map<string, ErdColumn[]>();
+    for (const c of cols)
+      (byTable.get(c.t) ?? byTable.set(c.t, []).get(c.t)!).push({
+        name: c.name,
+        type: c.type,
+        nullable: c.nullable,
+        pk: pkSet.has(`${c.t}\u0000${c.name}`),
+        fk: fkSet.has(`${c.t}\u0000${c.name}`),
+      });
+    return {
+      schema,
+      tables: rels.map((r) => ({
+        name: r.name,
+        kind: r.kind === 'v' || r.kind === 'm' ? 'view' : 'table',
+        rows: r.rows === null ? null : Number(r.rows),
+        comment: r.comment,
+        columns: byTable.get(r.name) ?? [],
+      })),
+      relations: fks.map((f) => ({
+        name: f.name,
+        from: f.t,
+        fromColumns: f.cols,
+        toSchema: f.rs,
+        to: f.rt,
+        toColumns: f.rcols,
+        onDelete: FK[f.del] ?? f.del,
+      })),
+    };
   }
 
   async completion(db: string): Promise<CompletionSchema> {
