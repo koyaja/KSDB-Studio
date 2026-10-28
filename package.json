@@ -1,7 +1,7 @@
 {
   "name": "ksdb-studio",
-  "version": "1.5.0",
-  "description": "Gestionnaire de bases de données léger pour PostgreSQL et MySQL/MariaDB",
+  "version": "1.5.2",
+  "description": "Gestionnaire de bases de donn\u00e9es l\u00e9ger pour PostgreSQL et MySQL/MariaDB",
   "main": "dist/main/main.js",
   "scripts": {
     "dev": "concurrently -k -n vite,main,app \"vite\" \"node scripts/build-main.mjs --watch\" \"wait-on tcp:5173 file:dist/main/main.js && electron . --dev\"",

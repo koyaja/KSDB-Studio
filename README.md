@@ -22,12 +22,12 @@ Lance `KSDB-Studio-Setup-<version>.exe`. L’application n’est pas signée : W
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./KSDB-Studio-1.5.0-linux-amd64.deb
+sudo apt install ./KSDB-Studio-1.5.2-linux-amd64.deb
 ksdb-studio
 
 # AppImage (toutes distributions)
-chmod +x KSDB-Studio-1.5.0-linux-x86_64.AppImage
-./KSDB-Studio-1.5.0-linux-x86_64.AppImage
+chmod +x KSDB-Studio-1.5.2-linux-x86_64.AppImage
+./KSDB-Studio-1.5.2-linux-x86_64.AppImage
 # Ubuntu 22.04+ : sudo apt install libfuse2t64   (ou libfuse2)
 # Erreur « sandbox » sur Ubuntu 24.04 : ajouter --no-sandbox
 ```
@@ -89,9 +89,9 @@ Windows demande une autorisation administrateur (UAC) à chaque démarrage ou ar
 
 ## Publier une version
 
-1. Mettre à jour `version` dans `package.json` et pousser sur `main`.
-2. Sur GitHub : **Releases → Draft a new release**, tag `vX.Y.Z` (identique à `package.json`), cible `main`, notes de version en markdown, **Publish release**.
-3. GitHub Actions compile Windows et Linux et joint les fichiers à la release. Les installations existantes sont prévenues automatiquement.
+1. Sur GitHub : **Releases → Draft a new release**, nouveau tag `vX.Y.Z`, cible `main`, notes de version en markdown, **Publish release**.
+2. GitHub Actions aligne la version de l’application sur le tag, compile Windows et Linux et joint les fichiers à la release (10 à 15 min). Les installations existantes sont prévenues automatiquement.
+3. Si une compilation a échoué : **Actions → Build KSDB Studio → Run workflow**, renseigner le tag de la release à compléter.
 
 ## Développement
 

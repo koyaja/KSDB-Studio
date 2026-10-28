@@ -92,7 +92,7 @@ async function main() {
       const f = await download(`http://127.0.0.1:${port}/ok`, path.join(dir, 'a.AppImage'), (d) => (last = d));
       assert.equal(fs.statSync(f).size, payload.length);
       assert.equal(last, payload.length);
-      assert.equal((fs.statSync(f).mode & 0o111) !== 0, true, 'AppImage exécutable');
+      if (process.platform !== 'win32') assert.equal((fs.statSync(f).mode & 0o111) !== 0, true, 'AppImage exécutable');
       await assert.rejects(download(`http://127.0.0.1:${port}/court`, path.join(dir, 'b.deb'), () => {}));
       assert.ok(!fs.existsSync(path.join(dir, 'b.deb')) && !fs.existsSync(path.join(dir, 'b.deb.part')), 'pas de fichier partiel');
     } finally {

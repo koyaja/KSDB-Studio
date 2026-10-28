@@ -58,7 +58,8 @@ function fakeLinux(opts: { nm: boolean; wgQuick?: boolean; pkexecDenied?: boolea
     if (cmd === 'nmcli' && args[1] === 'import') {
       const file = args[args.length - 1];
       assert.ok(fs.existsSync(file), 'le .conf doit exister pendant l’import');
-      assert.equal((fs.statSync(file).mode & 0o777).toString(8), '600');
+      // droits Unix : sans objet sous Windows
+      if (process.platform !== 'win32') assert.equal((fs.statSync(file).mode & 0o777).toString(8), '600');
       nm.add(path.basename(file, '.conf'));
       return ok();
     }
