@@ -1,6 +1,10 @@
 name: Build KSDB Studio
 
 on:
+  # Publier une release sur GitHub (avec un nouveau tag vX.Y.Z) suffit :
+  # Windows et Linux sont compilés puis joints automatiquement.
+  release:
+    types: [published]
   push:
     tags: ['v*']
   workflow_dispatch:
@@ -37,9 +41,10 @@ jobs:
             release/*.AppImage
             release/*.deb
       - name: Joindre à la release
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'release' || startsWith(github.ref, 'refs/tags/')
         uses: softprops/action-gh-release@v2
         with:
+          tag_name: ${{ github.event.release.tag_name || github.ref_name }}
           files: |
             release/*.exe
             release/*.AppImage
