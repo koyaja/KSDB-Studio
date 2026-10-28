@@ -1,6 +1,6 @@
 # KSDB Studio
 
-Gestionnaire de bases de données léger pour **PostgreSQL**, **MySQL** et **MariaDB**, sous **Windows** et **Linux**.
+Gestionnaire de bases de données léger pour **PostgreSQL**, **MySQL** et **MariaDB**, sous **Windows**, **macOS** et **Linux**.
 L’essentiel de Navicat, pgAdmin et DataGrip réuni dans une seule application, avec en plus le tunnel SSH, le VPN WireGuard et l’import des connexions Navicat.
 
 ![Éditeur SQL, thème Nuit douce](docs/screenshots/editeur-nuit-douce.png)
@@ -14,20 +14,33 @@ Dernière version : [**Releases**](https://github.com/koyaja/KSDB-Studio/release
 | Windows 10 / 11 (64 bits) | `KSDB-Studio-Setup-<version>.exe` |
 | Debian / Ubuntu | `KSDB-Studio-<version>-linux-amd64.deb` |
 | Toute distribution Linux | `KSDB-Studio-<version>-linux-x86_64.AppImage` |
+| macOS Apple Silicon (M1 à M4) | `KSDB-Studio-<version>-mac-arm64.dmg` |
+| macOS Intel | `KSDB-Studio-<version>-mac-x64.dmg` |
 
 ### Installer sous Windows
 Lance `KSDB-Studio-Setup-<version>.exe`. L’application n’est pas signée : Windows SmartScreen affiche un avertissement, clique sur **Informations complémentaires** puis **Exécuter quand même**.
+
+### Installer sous macOS
+Ouvre le `.dmg` et glisse **KSDB Studio** dans **Applications**. L’application n’est pas notariée par Apple : au premier lancement, macOS la bloque.
+- Ouvre **Réglages Système → Confidentialité et sécurité**, puis **Ouvrir quand même** en face de KSDB Studio ;
+- ou, si macOS indique que l’application est « endommagée » :
+
+```bash
+xattr -cr "/Applications/KSDB Studio.app"
+```
+
+Outils de sauvegarde : `brew install libpq mysql-client` (ou Postgres.app). VPN : tunnels de l’application WireGuard de l’App Store, ou `brew install wireguard-tools` pour un fichier `.conf`.
 
 ### Installer sous Linux
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./KSDB-Studio-1.5.2-linux-amd64.deb
+sudo apt install ./KSDB-Studio-<version>-linux-amd64.deb
 ksdb-studio
 
 # AppImage (toutes distributions)
-chmod +x KSDB-Studio-1.5.2-linux-x86_64.AppImage
-./KSDB-Studio-1.5.2-linux-x86_64.AppImage
+chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
+./KSDB-Studio-<version>-linux-x86_64.AppImage
 # Ubuntu 22.04+ : sudo apt install libfuse2t64   (ou libfuse2)
 # Erreur « sandbox » sur Ubuntu 24.04 : ajouter --no-sandbox
 ```
@@ -107,7 +120,7 @@ Windows demande une autorisation administrateur (UAC) à chaque démarrage ou ar
 
 1. Ajouter une section `## [X.Y.Z]` en tête de `CHANGELOG.md` (elle devient les notes de la release).
 2. Passer `version` à `X.Y.Z` dans `package.json` et pousser sur `main`.
-3. GitHub Actions crée le tag `vX.Y.Z` et la release, compile Windows et Linux et joint les fichiers (10 à 15 min). Les installations existantes sont prévenues automatiquement.
+3. GitHub Actions crée le tag `vX.Y.Z` et la release, compile Windows, Linux et macOS et joint les fichiers (10 à 15 min). Les installations existantes sont prévenues automatiquement.
 
 Un push sans changement de version ne publie rien (simple compilation de vérification). Pour compléter une release dont une compilation a échoué : **Actions → Build KSDB Studio → Run workflow** avec le tag.
 
@@ -127,11 +140,12 @@ npm run test:compare # comparaison de schémas : diff → script appliqué → n
 npm run test:transfer # transfert de données : PG → PG, MariaDB → MariaDB, PG ↔ MariaDB
 npm run dist:linux   # AppImage + .deb dans release/
 npm run dist:win     # installateur Windows dans release/
+npm run dist:mac     # .dmg Apple Silicon + Intel dans release/ (sur un Mac)
 ```
 
 Les tests moteur visent par défaut PostgreSQL `postgres/secret@127.0.0.1:5432` et MariaDB `ks/secret@127.0.0.1:3306` avec une base `boutique`. Variables : `KSDB_PG_HOST`, `KSDB_PG_PORT`, `KSDB_PG_USER`, `KSDB_PG_PASS`, `KSDB_MY_PORT`, `KSDB_MY_USER`, `KSDB_MY_PASS`, `KSDB_SSH_PORT`, `KSDB_SSH_KEY`.
 
-Le workflow GitHub Actions `.github/workflows/build.yml` compile Windows et Linux à chaque tag `v*` et joint les fichiers à la release.
+Le workflow GitHub Actions `.github/workflows/build.yml` compile Windows, Linux et macOS à chaque tag `v*` et joint les fichiers à la release.
 
 ### Architecture
 
@@ -142,7 +156,7 @@ src/
     drivers/       postgres.ts (pg + pg-cursor), mysql.ts (mysql2), base.ts
     connections.ts pools, sessions par onglet, tunnel SSH, démarrage du VPN
     tunnel.ts      ssh2 → port local
-    vpn.ts         WireGuard : wireguard.exe (UAC) / nmcli / wg-quick
+    vpn.ts         WireGuard : wireguard.exe (UAC) / nmcli / wg-quick / scutil (macOS)
     transfer.ts    transfert de données entre connexions (flux, lots, ordre des FK)
     tools.ts       pg_dump / pg_restore / psql / mysqldump / mysql
     navicat.ts     import .ncx (AES-128-CBC Navicat 12+)
@@ -153,7 +167,7 @@ src/
   renderer/        React + CodeMirror 6 + grille virtualisée
 ```
 
-Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studio/data` (Linux).
+Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studio/data` (Linux), `~/Library/Application Support/KSDB Studio/data` (macOS).
 
 ## Feuille de route
 

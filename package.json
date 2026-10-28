@@ -1,6 +1,6 @@
 {
   "name": "ksdb-studio",
-  "version": "1.6.0",
+  "version": "1.7.0",
   "description": "Gestionnaire de bases de données léger pour PostgreSQL et MySQL/MariaDB",
   "main": "dist/main/main.js",
   "scripts": {

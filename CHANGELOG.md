@@ -3,6 +3,18 @@
 Chaque section `## [X.Y.Z]` devient automatiquement les notes de la release GitHub correspondante,
 affichées aussi dans la fenêtre de mise à jour de KSDB Studio.
 
+## [1.7.0]
+
+### Nouveautés
+- **Version macOS** : `.dmg` pour Apple Silicon (M1 à M4) et pour Intel
+  - menu d’application macOS (⌘Q, masquer, fenêtres)
+  - mises à jour : le bon `.dmg` est téléchargé selon le processeur
+  - VPN : tunnels de l’application WireGuard (App Store) sans mot de passe, fichiers `.conf` via `wg-quick` (Homebrew)
+  - outils de sauvegarde détectés dans Homebrew (`libpq`, `postgresql@…`, `mysql-client`, `mariadb`) et Postgres.app
+
+### Installation macOS
+L’application n’est pas notariée : au premier lancement, **Réglages Système → Confidentialité et sécurité → Ouvrir quand même**. Si macOS la dit « endommagée » : `xattr -cr "/Applications/KSDB Studio.app"`.
+
 ## [1.6.0]
 
 ### Nouveautés
