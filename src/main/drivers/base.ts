@@ -1,3 +1,4 @@
+import type { SchemaSnapshot } from '../../shared/schemadiff';
 import type {
   CellValue,
   DbKind,
@@ -48,6 +49,8 @@ export interface Driver {
   completion(db: string): Promise<CompletionSchema>;
   /** Modèle complet d'un schéma pour le diagramme ERD (requêtes groupées). */
   erdModel(db: string, schema: string): Promise<ErdModel>;
+  /** Instantané complet pour la comparaison de schémas. */
+  snapshot(db: string, schema: string): Promise<SchemaSnapshot>;
 
   /** Exécute un script dans une session dédiée (onglet de requête). */
   execute(sessionId: string, db: string, statements: string[], maxRows: number): Promise<QueryResult[]>;

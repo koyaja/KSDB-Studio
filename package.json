@@ -1,7 +1,7 @@
 {
   "name": "ksdb-studio",
-  "version": "1.4.0",
-  "description": "Gestionnaire de bases de donn\u00e9es l\u00e9ger pour PostgreSQL et MySQL/MariaDB",
+  "version": "1.5.0",
+  "description": "Gestionnaire de bases de données léger pour PostgreSQL et MySQL/MariaDB",
   "main": "dist/main/main.js",
   "scripts": {
     "dev": "concurrently -k -n vite,main,app \"vite\" \"node scripts/build-main.mjs --watch\" \"wait-on tcp:5173 file:dist/main/main.js && electron . --dev\"",
@@ -15,7 +15,8 @@
     "dist:linux": "npm run build && electron-builder --linux",
     "dist": "npm run build && electron-builder",
     "test:vpn": "node scripts/build-main.mjs && node dist/test/vpn.test.js",
-    "test:update": "node scripts/build-main.mjs && node dist/test/update.test.js"
+    "test:update": "node scripts/build-main.mjs && node dist/test/update.test.js",
+    "test:compare": "node scripts/build-main.mjs && node dist/test/compare.test.js"
   },
   "author": {
     "name": "CYBERISK",

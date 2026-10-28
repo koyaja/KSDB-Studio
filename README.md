@@ -22,12 +22,12 @@ Lance `KSDB-Studio-Setup-<version>.exe`. L’application n’est pas signée : W
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./KSDB-Studio-1.4.0-linux-amd64.deb
+sudo apt install ./KSDB-Studio-1.5.0-linux-amd64.deb
 ksdb-studio
 
 # AppImage (toutes distributions)
-chmod +x KSDB-Studio-1.4.0-linux-x86_64.AppImage
-./KSDB-Studio-1.4.0-linux-x86_64.AppImage
+chmod +x KSDB-Studio-1.5.0-linux-x86_64.AppImage
+./KSDB-Studio-1.5.0-linux-x86_64.AppImage
 # Ubuntu 22.04+ : sudo apt install libfuse2t64   (ou libfuse2)
 # Erreur « sandbox » sur Ubuntu 24.04 : ajouter --no-sandbox
 ```
@@ -44,6 +44,7 @@ chmod +x KSDB-Studio-1.4.0-linux-x86_64.AppImage
 | Données | Grille virtualisée ; pagination ; tri multi-colonnes ; filtre WHERE ; **édition directe** ; ajout / suppression de lignes ; aperçu du SQL ; enregistrement **dans une transaction** ; copie TSV ou INSERT ; éditeur de valeur (JSON formaté) |
 | Structure | Colonnes, index, clés étrangères, DDL ; **concepteur de table** (création et modification) avec le SQL généré visible |
 | Diagramme ERD | Diagramme automatique d’un schéma (tables, colonnes, PK/FK, nombre de lignes, relations en pattes de corbeau) ; zoom, déplacement, tables repositionnables (positions mémorisées) ; clic pour mettre en évidence les relations ; recherche ; affichage complet / clés / noms ; requête avec jointures générée ; export **PNG** et **SVG** |
+| Comparaison de schémas | Source ↔ cible (bases, schémas, connexions différentes, ex. dev → prod) : tables, colonnes, clés primaires, index, contraintes UNIQUE, clés étrangères, commentaires, vues, vues matérialisées, fonctions, procédures, triggers ; détail des différences et avertissements (perte de données, NOT NULL…) ; **script de migration** ordonné (FK, vues dépendantes supprimées puis recréées dans l’ordre) ; suppressions décochées par défaut ; ouvrir dans l’éditeur, enregistrer en .sql ou **appliquer sur la cible** (transaction sous PostgreSQL) |
 | Import / export | Export de table complète en CSV, TSV, JSON, SQL INSERT ; export des résultats ; **import CSV** (séparateur détecté, encodage, correspondance des colonnes, transaction unique) |
 | Sauvegarde | **Dump / restauration** via pg_dump, pg_restore, psql, mysqldump, mysql (détectés automatiquement), y compris à travers un tunnel SSH ou un VPN |
 | Serveur | Sessions actives, annulation de requête, fin de session |
@@ -55,12 +56,20 @@ chmod +x KSDB-Studio-1.4.0-linux-x86_64.AppImage
 | ![Données, thème Papier](docs/screenshots/donnees-papier.png) | ![VPN associé à un groupe](docs/screenshots/vpn-groupe.png) |
 | ![Concepteur de table](docs/screenshots/concepteur.png) | ![Sauvegarde avec pg_dump](docs/screenshots/sauvegarde.png) |
 | ![Diagramme ERD](docs/screenshots/erd.png) | ![Diagramme ERD, relations en évidence](docs/screenshots/erd-selection.png) |
+| ![Comparaison de schémas](docs/screenshots/comparaison.png) | ![Application du script de synchronisation](docs/screenshots/comparaison-application.png) |
 
 ## Migrer depuis Navicat
 
 1. Dans Navicat : **Fichier → Exporter les connexions…**, coche **Exporter le mot de passe**, enregistre le `.ncx`.
 2. Dans KSDB Studio : écran d’accueil → **Importer depuis Navicat** (ou Paramètres → Connexions).
 3. Les connexions PostgreSQL, MySQL et MariaDB sont importées dans le groupe « Navicat », avec mots de passe et tunnels SSH. Corrige les chemins de clés SSH si tu changes de système.
+
+## Comparer et synchroniser deux schémas
+
+1. Clic droit sur un schéma (PostgreSQL) ou une base (MySQL / MariaDB) → **Comparer avec…** : c’est la **source** (la référence, par exemple dev).
+2. Choisis la **cible** (celle à mettre à jour, par exemple prod), sur la même connexion ou une autre, puis **Comparer**.
+3. Coche les objets à synchroniser. Les suppressions (tables, colonnes, vues absentes de la source) sont décochées par défaut.
+4. **Voir le script**, **Ouvrir dans l’éditeur**, **Enregistrer** en .sql, ou **Appliquer sur la cible**. Sous PostgreSQL le script s’exécute dans une transaction ; sous MySQL les instructions de structure sont validées une à une : fais une sauvegarde avant.
 
 ## VPN WireGuard
 
@@ -96,6 +105,7 @@ npm start            # build + lancement
 npm run test:engine  # tests d'intégration sur de vraies bases PostgreSQL / MariaDB
 npm run test:vpn     # pilotage WireGuard (commandes système simulées, Windows + Linux)
 npm run test:update  # détection et téléchargement des mises à jour
+npm run test:compare # comparaison de schémas : diff → script appliqué → nouveau diff vide (PG + MariaDB)
 npm run dist:linux   # AppImage + .deb dans release/
 npm run dist:win     # installateur Windows dans release/
 ```
@@ -127,7 +137,6 @@ Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studi
 
 ## Feuille de route
 
-- Comparaison et synchronisation de schémas
 - Transfert de données entre serveurs
 - Gestion des utilisateurs et des droits
 - Plan EXPLAIN visuel

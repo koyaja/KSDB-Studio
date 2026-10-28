@@ -264,6 +264,7 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
   handle('db:ddl', async (id: string, db: string, schema: string, name: string, type: ObjectType, extra?: string) =>
     (await cm.get(id)).ddl(db, schema, name, type, extra),
   );
+  handle('db:snapshot', async (id: string, db: string, schema: string) => (await cm.get(id)).snapshot(db, schema));
   handle('db:erd', async (id: string, db: string, schema: string) => (await cm.get(id)).erdModel(db, schema));
   handle('app:erdLayout', (key: string) => store.erdLayout(key));
   handle('app:saveErdLayout', (key: string, layout: unknown) => store.saveErdLayout(key, layout));

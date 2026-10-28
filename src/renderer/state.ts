@@ -13,8 +13,15 @@ export type Tab =
   | { id: string; kind: 'import'; connectionId: string; database: string; schema: string; table: string }
   | { id: string; kind: 'processes'; connectionId: string }
   | { id: string; kind: 'erd'; connectionId: string; database: string; schema: string }
+  | { id: string; kind: 'compare'; source: CompareSide; target: CompareSide }
   | { id: string; kind: 'history' }
   | { id: string; kind: 'settings' };
+
+export interface CompareSide {
+  connectionId: string | null;
+  database: string;
+  schema: string;
+}
 
 export interface Toast {
   id: number;

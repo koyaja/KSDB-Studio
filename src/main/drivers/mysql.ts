@@ -36,6 +36,55 @@ const TYPE_NAMES = new Proxy({} as Record<number, string>, {
   },
 });
 
+import { normalizeSchema, SchemaSnapshot, SnapObject, SnapTable } from '../../shared/schemadiff';
+
+const unq = (s: string) => s.replace(/^`|`$/g, '').replace(/``/g, '`');
+const colList = (s: string) => (s.match(/`(?:[^`]|``)+`/g) ?? []).map(unq);
+
+/** Découpe un SHOW CREATE TABLE en colonnes, clés et contraintes. */
+export function parseMysqlCreate(name: string, sql: string): SnapTable {
+  const body = sql.slice(sql.indexOf('(') + 1, sql.lastIndexOf(')'));
+  const options = sql.slice(sql.lastIndexOf(')') + 1);
+  const t: SnapTable = { name, columns: [], pk: null, indexes: [], fks: [], comment: null };
+  for (const raw of body.split('\n')) {
+    const line = raw.trim().replace(/,$/, '');
+    if (!line) continue;
+    let m: RegExpExecArray | null;
+    if ((m = /^`((?:[^`]|``)+)`\s+(.*)$/.exec(line))) {
+      const def = m[2];
+      t.columns.push({
+        name: m[1].replace(/``/g, '`'),
+        type: def.split(/\s+/)[0],
+        nullable: !/\bNOT NULL\b/i.test(def),
+        default: null,
+        identity: '',
+        comment: null,
+        def,
+      });
+    } else if ((m = /^PRIMARY KEY\s*\((.*)\)/i.exec(line))) {
+      t.pk = { name: 'PRIMARY', columns: colList(m[1]) };
+    } else if ((m = /^(UNIQUE |FULLTEXT |SPATIAL )?KEY\s+`((?:[^`]|``)+)`\s*\((.*?)\)/i.exec(line))) {
+      t.indexes.push({ name: m[2].replace(/``/g, '`'), unique: /UNIQUE/i.test(m[1] ?? ''), columns: colList(m[3]), def: line });
+    } else if ((m = /^CONSTRAINT\s+`((?:[^`]|``)+)`\s+FOREIGN KEY\s*\((.*?)\)\s*REFERENCES\s+((?:`[^`]+`\.)?`[^`]+`)\s*\((.*?)\)(.*)$/i.exec(line))) {
+      const ref = colList(m[3]);
+      t.fks.push({
+        name: m[1].replace(/``/g, '`'),
+        columns: colList(m[2]),
+        refSchema: ref.length > 1 ? ref[0] : null,
+        refTable: ref[ref.length - 1],
+        refColumns: colList(m[4]),
+        onUpdate: /ON UPDATE (CASCADE|SET NULL|RESTRICT|NO ACTION|SET DEFAULT)/i.exec(m[5])?.[1]?.toUpperCase() ?? 'NO ACTION',
+        onDelete: /ON DELETE (CASCADE|SET NULL|RESTRICT|NO ACTION|SET DEFAULT)/i.exec(m[5])?.[1]?.toUpperCase() ?? 'NO ACTION',
+        def: line,
+      });
+    }
+  }
+  const c = /COMMENT='((?:[^']|'')*)'/.exec(options);
+  if (c) t.comment = c[1].replace(/''/g, "'");
+  t.createSql = sql.replace(/\s+AUTO_INCREMENT=\d+/i, '');
+  return t;
+}
+
 const SYSTEM_DBS = new Set(['information_schema', 'performance_schema', 'mysql', 'sys']);
 
 interface Session {
@@ -272,6 +321,48 @@ export class MysqlDriver implements Driver {
     const [r] = await this.q<Row>(undefined, `SHOW CREATE ${kw} ${q}`);
     const text = String(r?.[col] ?? Object.values(r ?? {})[1] ?? '');
     return text.trim() + ';\n';
+  }
+
+  async snapshot(db: string): Promise<SchemaSnapshot> {
+    const list = await this.q<{ n: string; t: string }>(
+      undefined,
+      'SELECT TABLE_NAME n, TABLE_TYPE t FROM information_schema.TABLES WHERE TABLE_SCHEMA = ? ORDER BY TABLE_NAME',
+      [db],
+    );
+    const tables: SnapTable[] = [];
+    const objects: SnapObject[] = [];
+    const stripDefiner = (s: string) => s.replace(/\s+DEFINER\s*=\s*(`[^`]*`|'[^']*'|\S+)@(`[^`]*`|'[^']*'|\S+)/i, '');
+    const norm = (s: string) => normalizeSchema(stripDefiner(s), db);
+    for (const t of list) {
+      if (/VIEW/i.test(t.t)) {
+        const [r] = await this.q<Row>(undefined, `SHOW CREATE VIEW ${this.qualified(db, t.n)}`);
+        objects.push({ name: t.n, key: t.n, kind: 'view', def: norm(String(r['Create View'])) });
+        continue;
+      }
+      const [r] = await this.q<Row>(undefined, `SHOW CREATE TABLE ${this.qualified(db, t.n)}`);
+      tables.push(parseMysqlCreate(t.n, String(r['Create Table'])));
+    }
+    const routines = await this.q<{ n: string; t: string }>(
+      undefined,
+      'SELECT ROUTINE_NAME n, ROUTINE_TYPE t FROM information_schema.ROUTINES WHERE ROUTINE_SCHEMA = ? ORDER BY ROUTINE_NAME',
+      [db],
+    );
+    for (const r of routines) {
+      const kw = r.t === 'PROCEDURE' ? 'PROCEDURE' : 'FUNCTION';
+      const [row] = await this.q<Row>(undefined, `SHOW CREATE ${kw} ${this.qualified(db, r.n)}`);
+      const def = String(row[kw === 'PROCEDURE' ? 'Create Procedure' : 'Create Function'] ?? '');
+      objects.push({ name: r.n, key: r.n, kind: kw === 'PROCEDURE' ? 'procedure' : 'function', def: norm(def) });
+    }
+    const triggers = await this.q<{ n: string; t: string }>(
+      undefined,
+      'SELECT TRIGGER_NAME n, EVENT_OBJECT_TABLE t FROM information_schema.TRIGGERS WHERE TRIGGER_SCHEMA = ? ORDER BY TRIGGER_NAME',
+      [db],
+    );
+    for (const tr of triggers) {
+      const [row] = await this.q<Row>(undefined, `SHOW CREATE TRIGGER ${this.qualified(db, tr.n)}`);
+      objects.push({ name: tr.n, key: tr.n, kind: 'trigger', table: tr.t, def: norm(String(row['SQL Original Statement'] ?? '')) });
+    }
+    return { kind: 'mysql', schema: db, tables, objects };
   }
 
   async erdModel(db: string): Promise<ErdModel> {

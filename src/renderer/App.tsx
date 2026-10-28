@@ -14,6 +14,7 @@ import {
   Clock3,
   Monitor,
   Network,
+  GitCompareArrows,
   Sun,
   Table2,
   Upload,
@@ -33,6 +34,7 @@ import { ImportTab } from './tabs/ImportTab';
 import { HistoryTab, openSettings, ProcessesTab, SettingsTab } from './tabs/MiscTabs';
 import { QueryTab } from './tabs/QueryTab';
 import { ErdTab } from './tabs/ErdTab';
+import { CompareTab } from './tabs/CompareTab';
 import { TableTab } from './tabs/TableTab';
 import {
   closeTab,
@@ -67,6 +69,8 @@ function tabTitle(t: Tab): string {
       return `Import → ${t.table}`;
     case 'processes':
       return `Processus · ${connectionById(t.connectionId)?.name ?? ''}`;
+    case 'compare':
+      return `Comparer ${t.source.database ? (t.source.schema !== t.source.database ? `${t.source.database}.${t.source.schema}` : t.source.database) : ''}${t.target.database ? ' → ' + (t.target.schema !== t.target.database ? `${t.target.database}.${t.target.schema}` : t.target.database) : ''}`;
     case 'erd':
       return `ERD ${t.schema !== t.database ? `${t.database}.${t.schema}` : t.database}`;
     case 'history':
@@ -91,6 +95,8 @@ function tabIcon(t: Tab) {
       return <FileInput {...p} />;
     case 'processes':
       return <Activity {...p} />;
+    case 'compare':
+      return <GitCompareArrows {...p} style={{ color: 'var(--accent)' }} />;
     case 'erd':
       return <Network {...p} style={{ color: 'var(--accent)' }} />;
     case 'history':
@@ -341,6 +347,8 @@ export function App() {
                   return <BackupTab key={t.id} tab={t} active={active} />;
                 case 'import':
                   return <ImportTab key={t.id} tab={t} active={active} />;
+                case 'compare':
+                  return <CompareTab key={t.id} tab={t} active={active} />;
                 case 'erd':
                   return <ErdTab key={t.id} tab={t} active={active} />;
                 case 'processes':

@@ -2,6 +2,7 @@ import fs from 'node:fs';
 import pg from 'pg';
 import Cursor from 'pg-cursor';
 import { returnsRows } from '../../shared/sqlsplit';
+import { normalizeSchema, SchemaSnapshot, SnapObject, SnapTable } from '../../shared/schemadiff';
 import type {
   CellValue,
   ColumnInfo,
@@ -355,6 +356,146 @@ export class PostgresDriver implements Driver {
     );
     for (const t of trg) out += `\n\n${t.d};`;
     return out.trim() + '\n';
+  }
+
+  async snapshot(db: string, schema: string): Promise<SchemaSnapshot> {
+    const rel = `n.nspname = $1 and c.relkind in ('r','p') and not c.relispartition`;
+    const [tbls, cols, pks, idx, fks, views, routines, triggers, deps] = await Promise.all([
+      this.q<{ t: string; comment: string | null }>(
+        db,
+        `select c.relname t, obj_description(c.oid, 'pg_class') as comment from pg_class c
+         join pg_namespace n on n.oid = c.relnamespace where ${rel} order by 1`,
+        [schema],
+      ),
+      this.q<{ t: string; name: string; type: string; nullable: boolean; def: string | null; ident: string; comment: string | null }>(
+        db,
+        `select c.relname t, a.attname as name, format_type(a.atttypid, a.atttypmod) as type, not a.attnotnull as nullable,
+                pg_get_expr(d.adbin, d.adrelid) as def, a.attidentity::text as ident, col_description(a.attrelid, a.attnum) as comment
+         from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
+         left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
+         where ${rel} and a.attnum > 0 and not a.attisdropped order by c.relname, a.attnum`,
+        [schema],
+      ),
+      this.q<{ t: string; name: string; cols: string[] }>(
+        db,
+        `select c.relname t, con.conname as name,
+                array(select a.attname from unnest(con.conkey) with ordinality k(n, o)
+                      join pg_attribute a on a.attrelid = con.conrelid and a.attnum = k.n order by k.o)::text[] as cols
+         from pg_constraint con join pg_class c on c.oid = con.conrelid join pg_namespace n on n.oid = c.relnamespace
+         where ${rel} and con.contype = 'p'`,
+        [schema],
+      ),
+      this.q<{ t: string; name: string; uniq: boolean; def: string; cols: string[]; con: string | null }>(
+        db,
+        `select c.relname t, i.relname as name, ix.indisunique as uniq, pg_get_indexdef(ix.indexrelid) as def,
+                array(select pg_get_indexdef(ix.indexrelid, k, true) from generate_series(1, ix.indnatts) k order by k)::text[] as cols,
+                (select con.contype::text from pg_constraint con where con.conindid = ix.indexrelid and con.conrelid = c.oid limit 1) as con
+         from pg_index ix join pg_class i on i.oid = ix.indexrelid join pg_class c on c.oid = ix.indrelid
+         join pg_namespace n on n.oid = c.relnamespace
+         where ${rel} and not ix.indisprimary order by 1, 2`,
+        [schema],
+      ),
+      this.q<{ name: string; t: string; cols: string[]; rs: string; rt: string; rcols: string[]; upd: string; del: string }>(
+        db,
+        `select con.conname as name, c.relname as t,
+                array(select a.attname from unnest(con.conkey) with ordinality k(n, o)
+                      join pg_attribute a on a.attrelid = con.conrelid and a.attnum = k.n order by k.o)::text[] as cols,
+                rn.nspname as rs, rc.relname as rt,
+                array(select a.attname from unnest(con.confkey) with ordinality k(n, o)
+                      join pg_attribute a on a.attrelid = con.confrelid and a.attnum = k.n order by k.o)::text[] as rcols,
+                con.confupdtype::text as upd, con.confdeltype::text as del
+         from pg_constraint con join pg_class c on c.oid = con.conrelid join pg_namespace n on n.oid = c.relnamespace
+         join pg_class rc on rc.oid = con.confrelid join pg_namespace rn on rn.oid = rc.relnamespace
+         where ${rel} and con.contype = 'f' order by 2, 1`,
+        [schema],
+      ),
+      this.q<{ name: string; kind: string; def: string }>(
+        db,
+        `select c.relname as name, c.relkind::text as kind, pg_get_viewdef(c.oid, true) as def
+         from pg_class c join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = $1 and c.relkind in ('v','m') order by 1`,
+        [schema],
+      ),
+      this.q<{ name: string; args: string; kind: string; def: string }>(
+        db,
+        `select p.proname as name, oidvectortypes(p.proargtypes) as args, p.prokind::text as kind, pg_get_functiondef(p.oid) as def
+         from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+         where n.nspname = $1 and p.prokind in ('f','p')
+           and not exists (select 1 from pg_depend d where d.objid = p.oid and d.deptype = 'e')
+         order by 1, 2`,
+        [schema],
+      ).catch(() => [] as { name: string; args: string; kind: string; def: string }[]),
+      this.q<{ name: string; t: string; def: string }>(
+        db,
+        `select t.tgname as name, c.relname as t, pg_get_triggerdef(t.oid, true) as def
+         from pg_trigger t join pg_class c on c.oid = t.tgrelid join pg_namespace n on n.oid = c.relnamespace
+         where n.nspname = $1 and not t.tgisinternal order by 2, 1`,
+        [schema],
+      ),
+      this.q<{ v: string; d: string }>(
+        db,
+        `select distinct v.relname as v, d.relname as d
+         from pg_rewrite r join pg_class v on v.oid = r.ev_class join pg_namespace n on n.oid = v.relnamespace
+         join pg_depend dp on dp.objid = r.oid and dp.classid = 'pg_rewrite'::regclass
+         join pg_class d on d.oid = dp.refobjid join pg_namespace dn on dn.oid = d.relnamespace
+         where n.nspname = $1 and dn.nspname = $1 and v.relkind in ('v','m') and d.oid <> v.oid`,
+        [schema],
+      ),
+    ]);
+    const depsOf = new Map<string, string[]>();
+    for (const r of deps) (depsOf.get(r.v) ?? depsOf.set(r.v, []).get(r.v)!).push(r.d);
+    const norm = (s: string) => normalizeSchema(s, schema);
+    const group = <T extends { t: string }>(rows: T[]) => {
+      const m = new Map<string, T[]>();
+      for (const r of rows) (m.get(r.t) ?? m.set(r.t, []).get(r.t)!).push(r);
+      return m;
+    };
+    const colsBy = group(cols);
+    const idxBy = group(idx);
+    const fkBy = group(fks);
+    const pkBy = new Map(pks.map((p) => [p.t, p]));
+    const tables: SnapTable[] = tbls.map((t) => ({
+      name: t.t,
+      comment: t.comment,
+      columns: (colsBy.get(t.t) ?? []).map((c) => ({
+        name: c.name,
+        type: c.type,
+        nullable: c.nullable,
+        default: c.def === null ? null : norm(c.def),
+        identity: c.ident ?? '',
+        comment: c.comment,
+      })),
+      pk: pkBy.has(t.t) ? { name: pkBy.get(t.t)!.name, columns: pkBy.get(t.t)!.cols } : null,
+      indexes: (idxBy.get(t.t) ?? [])
+        .filter((i) => i.con !== 'p' && i.con !== 'x')
+        .map((i) => ({ name: i.name, unique: i.uniq, columns: i.cols, def: norm(i.def), constraint: i.con === 'u' })),
+      fks: (fkBy.get(t.t) ?? []).map((f) => ({
+        name: f.name,
+        columns: f.cols,
+        refSchema: f.rs === schema ? null : f.rs,
+        refTable: f.rt,
+        refColumns: f.rcols,
+        onUpdate: FK_ACTIONS[f.upd] ?? f.upd,
+        onDelete: FK_ACTIONS[f.del] ?? f.del,
+      })),
+    }));
+    const objects: SnapObject[] = [
+      ...views.map((v) => ({
+        name: v.name,
+        key: v.name,
+        kind: (v.kind === 'm' ? 'matview' : 'view') as SnapObject['kind'],
+        def: `${v.kind === 'm' ? 'CREATE MATERIALIZED VIEW' : 'CREATE OR REPLACE VIEW'} {S}.${this.quoteIdent(v.name)} AS\n${norm(v.def).replace(/;\s*$/, '')}`,
+        deps: depsOf.get(v.name) ?? [],
+      })),
+      ...routines.map((r) => ({
+        name: r.name,
+        key: `${r.name}(${r.args})`,
+        kind: (r.kind === 'p' ? 'procedure' : 'function') as SnapObject['kind'],
+        def: norm(r.def).trim(),
+      })),
+      ...triggers.map((t) => ({ name: t.name, key: `${t.t}.${t.name}`, kind: 'trigger' as const, table: t.t, def: norm(t.def) })),
+    ];
+    return { kind: 'postgres', schema, tables, objects };
   }
 
   async erdModel(db: string, schema: string): Promise<ErdModel> {

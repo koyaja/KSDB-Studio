@@ -15,6 +15,7 @@ import {
   Layers,
   Loader2,
   Network,
+  GitCompareArrows,
   Pencil,
   Plug,
   Plus,
@@ -127,6 +128,15 @@ export function Sidebar() {
       {groupVpn && <GroupVpnDialog group={groupVpn} onClose={() => setGroupVpn(null)} />}
     </aside>
   );
+}
+
+function openCompare(connectionId: string, database: string, schema: string) {
+  openTab({
+    id: uid(),
+    kind: 'compare',
+    source: { connectionId, database, schema },
+    target: { connectionId, database: '', schema: '' },
+  });
 }
 
 function vpnMenuItems(vpnId: string | null | undefined): MenuItem[] {
@@ -393,7 +403,12 @@ function DatabaseNode({ conn, db }: { conn: ListedConnection; db: string }) {
   const menu = (e: React.MouseEvent) =>
     openMenu(e, [
       { label: 'Nouvelle requête', icon: <FileCode />, onClick: () => newQueryTab(conn.id, db) },
-      ...(isMy ? [{ label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema: db }) }] : []),
+      ...(isMy
+        ? [
+            { label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema: db }) },
+            { label: 'Comparer avec…', icon: <GitCompareArrows />, onClick: () => openCompare(conn.id, db, db) },
+          ]
+        : []),
       ...(isMy ? [{ label: 'Nouvelle table', icon: <FilePlus2 />, onClick: () => openTab({ id: uid(), kind: 'designer', connectionId: conn.id, database: db, schema: db, table: null }) }] : []),
       ...(!isMy
         ? [
@@ -464,6 +479,7 @@ function SchemaNode({ conn, db, schema }: { conn: ListedConnection; db: string; 
     openMenu(e, [
       { label: 'Nouvelle requête', icon: <FileCode />, onClick: () => newQueryTab(conn.id, db, `SET search_path TO ${quoteIdent('postgres', schema)};\n\n`) },
       { label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema }) },
+      { label: 'Comparer avec…', icon: <GitCompareArrows />, onClick: () => openCompare(conn.id, db, schema) },
       { label: 'Nouvelle table', icon: <FilePlus2 />, onClick: () => openTab({ id: uid(), kind: 'designer', connectionId: conn.id, database: db, schema, table: null }) },
       { label: 'Actualiser', icon: <RefreshCw />, onClick: () => bumpTree(key) },
       { label: 'Copier le nom', icon: <Copy />, onClick: () => copyText(schema) },
