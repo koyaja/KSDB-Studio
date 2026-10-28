@@ -220,6 +220,10 @@ export interface Settings {
   pageSize: number;
   editorFontSize: number;
   uppercaseKeywords: boolean;
+  /** Vérifier les nouvelles versions au démarrage puis toutes les 6 h */
+  checkUpdates?: boolean;
+  /** Version dont l'utilisateur ne veut plus être averti */
+  skippedVersion?: string;
   binaries: {
     pg_dump?: string;
     pg_restore?: string;
@@ -335,4 +339,29 @@ export interface ErdModel {
   schema: string;
   tables: ErdTable[];
   relations: ErdRelation[];
+}
+
+// ---------- Mises à jour ----------
+
+export interface UpdateInfo {
+  current: string;
+  latest: string;
+  available: boolean;
+  notes: string;
+  url: string;
+  publishedAt: string;
+  asset: { name: string; url: string; size: number } | null;
+  installKind: 'windows' | 'appimage' | 'deb' | 'other';
+}
+
+export interface AppInfo {
+  version: string;
+  platform: string;
+  arch: string;
+  electron: string;
+  chrome: string;
+  node: string;
+  installKind: 'windows' | 'appimage' | 'deb' | 'other';
+  dataDir: string;
+  releasesUrl: string;
 }

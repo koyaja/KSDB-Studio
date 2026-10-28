@@ -26,6 +26,8 @@ import type {
   ToolStatus,
   GroupSettings,
   ErdModel,
+  AppInfo,
+  UpdateInfo,
   VpnBackendInfo,
   VpnProfile,
   VpnStatus,
@@ -37,6 +39,7 @@ declare global {
       invoke: (channel: string, ...args: unknown[]) => Promise<ApiResult<unknown>>;
       onJob: (cb: (ev: JobEvent) => void) => () => void;
       onVpn: (cb: (ev: VpnEvent) => void) => () => void;
+      onUpdate: (cb: (ev: UpdateEvent) => void) => () => void;
       platform: string;
     };
   }
@@ -58,6 +61,8 @@ export interface VpnEvent {
   ownedBySession?: boolean;
   detail?: string;
 }
+
+export type UpdateEvent = (UpdateInfo & { open?: boolean }) | { progress: { done: number; total: number } };
 
 export interface VpnEntry {
   profile: VpnProfile;
@@ -89,6 +94,13 @@ export const api = {
   readText: (p: string) => call<string>('app:readText', p),
   writeText: (p: string, c: string) => call<void>('app:writeText', p, c),
   showItem: (p: string) => call<void>('app:showItem', p),
+  openExternal: (url: string) => call<void>('app:openExternal', url),
+  appInfo: () => call<AppInfo>('app:info'),
+  checkUpdate: () => call<UpdateInfo | null>('app:checkUpdate'),
+  lastUpdate: () => call<UpdateInfo | null>('app:lastUpdate'),
+  downloadUpdate: () => call<string>('app:downloadUpdate'),
+  cancelDownload: () => call<void>('app:cancelDownload'),
+  installUpdate: (file: string) => call<'started' | 'relaunch' | 'manual'>('app:installUpdate', file),
 
   listConnections: () => call<ListedConnection[]>('conn:list'),
   saveConnection: (c: ConnectionConfig) => call<string>('conn:save', c),

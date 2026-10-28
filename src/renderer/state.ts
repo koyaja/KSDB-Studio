@@ -2,7 +2,8 @@
 import { useSyncExternalStore } from 'react';
 import type { ObjectType, Settings } from '../shared/types';
 import { api, ListedConnection, VpnEntry, VpnEvent } from './api';
-import type { GroupSettings, ThemeId } from '../shared/types';
+import type { AppInfo, GroupSettings, ThemeId, UpdateInfo } from '../shared/types';
+import type { DownloadState } from './components/Updates';
 
 export type Tab =
   | { id: string; kind: 'query'; title: string; connectionId: string | null; database: string; sql: string; filePath?: string; dirty?: boolean }
@@ -52,12 +53,19 @@ export interface AppState {
   vpnTransient: Record<string, { state: 'starting' | 'stopping' | null; detail?: string }>;
   groups: Record<string, GroupSettings>;
   vpnManagerOpen: boolean;
+  appInfo: AppInfo | null;
+  update: UpdateInfo | null;
+  updateOpen: boolean;
+  updateChecking: boolean;
+  updateCheckedAt: number | null;
+  download: DownloadState;
+  aboutOpen: boolean;
 }
 
 const listeners = new Set<() => void>();
 let state: AppState = {
   connections: [],
-  settings: { theme: 'dark', maxRows: 2000, pageSize: 200, editorFontSize: 13, uppercaseKeywords: true, binaries: {} },
+  settings: { theme: 'dark', maxRows: 2000, pageSize: 200, editorFontSize: 13, uppercaseKeywords: true, checkUpdates: true, binaries: {} },
   tabs: [],
   activeTab: null,
   toasts: [],
@@ -70,6 +78,13 @@ let state: AppState = {
   vpnTransient: {},
   groups: {},
   vpnManagerOpen: false,
+  appInfo: null,
+  update: null,
+  updateOpen: false,
+  updateChecking: false,
+  updateCheckedAt: null,
+  download: { state: 'idle', done: 0, total: 0 },
+  aboutOpen: false,
 };
 
 export function getState() {

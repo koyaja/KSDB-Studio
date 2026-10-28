@@ -21,6 +21,7 @@ const builds = [
   { ...common, entryPoints: ['src/preload/preload.ts'], outfile: 'dist/preload/preload.js' },
   { ...common, entryPoints: ['src/test/engine.test.ts'], outfile: 'dist/test/engine.test.js' },
   { ...common, entryPoints: ['src/test/vpn.test.ts'], outfile: 'dist/test/vpn.test.js' },
+  { ...common, entryPoints: ['src/test/update.test.ts'], outfile: 'dist/test/update.test.js' },
 ];
 
 if (watch) {

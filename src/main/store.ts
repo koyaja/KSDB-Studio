@@ -196,6 +196,7 @@ export class Store {
       pageSize: 200,
       editorFontSize: 13,
       uppercaseKeywords: true,
+      checkUpdates: true,
       binaries: {},
       ...readJson<Partial<Settings>>('settings.json', {}),
     };

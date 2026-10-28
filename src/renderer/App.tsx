@@ -24,6 +24,7 @@ import { api } from './api';
 import { ConnectionDialog } from './components/ConnectionDialog';
 import { Sidebar } from './components/Sidebar';
 import { VpnManager } from './components/VpnManager';
+import { AboutDialog, UpdateDialog, UpdatePill } from './components/Updates';
 import { DEFAULT_SCHEDULE, resolveTheme, THEMES, themeInfo } from './themes';
 import { ContextMenuHost, DialogHost, Logo, openMenu, Toasts, useDrag } from './components/ui';
 import { BackupTab } from './tabs/BackupTab';
@@ -107,6 +108,7 @@ export function App() {
   const settings = useApp((s) => s.settings);
   const themeResolved = useApp((s) => s.themeResolved);
   const connections = useApp((s) => s.connections);
+  const appInfo = useApp((s) => s.appInfo);
   const [sidebarW, setSidebarW] = useState(290);
   const dragStart = useRef(290);
 
@@ -118,12 +120,31 @@ export function App() {
         setState({ settings: s });
         await refreshConnections();
         await refreshVpns().catch(() => {});
+        api.appInfo().then((appInfo) => setState({ appInfo })).catch(() => {});
+        api.lastUpdate().then((u) => u && setState({ update: u })).catch(() => {});
         await restoreWorkspace();
       } catch (e) {
         toast((e as Error).message, 'error');
       }
     })();
   }, []);
+
+  // Notifications de mise à jour (vérification automatique côté process principal)
+  useEffect(
+    () =>
+      window.ksdb.onUpdate((ev) => {
+        if ('progress' in ev) {
+          setState((s) => ({ download: { ...s.download, state: 'downloading', done: ev.progress.done, total: ev.progress.total } }));
+          return;
+        }
+        const { open, ...info } = ev;
+        setState({ update: info, updateCheckedAt: Date.now() });
+        if (open) setState({ updateOpen: true });
+        else if (info.available && getState().settings.skippedVersion !== info.latest)
+          toast(`KSDB Studio ${info.latest} est disponible. Clique sur « Mise à jour » en haut.`, 'info');
+      }),
+    [],
+  );
 
   // Événements VPN + rafraîchissement périodique de l'état des tunnels
   useEffect(() => {
@@ -204,6 +225,7 @@ export function App() {
         </button>
         <VpnTopButton />
         <span className="spacer" />
+        <UpdatePill />
         <button
           className="btn icon"
           title={`Thème : ${themeInfo(themeResolved).label}${settings.theme === 'schedule' ? ' (selon l’heure)' : settings.theme === 'system' ? ' (système)' : ''}`}
@@ -352,10 +374,15 @@ export function App() {
           <span>{connections.length} connexion(s) enregistrée(s)</span>
         )}
         <span style={{ marginLeft: 'auto' }}>{connected ? `${connected} connectée(s)` : 'Aucune connexion active'}</span>
+        <button className="status-version" onClick={() => setState({ aboutOpen: true })} title="À propos de KSDB Studio">
+          v{appInfo?.version ?? '…'}
+        </button>
       </footer>
 
       <ConnectionDialog />
       <VpnManager />
+      <UpdateDialog />
+      <AboutDialog />
       <DialogHost />
       <ContextMenuHost />
       <Toasts />
@@ -365,9 +392,12 @@ export function App() {
 
 function Welcome() {
   const connections = useApp((s) => s.connections);
+  const appVersion = useApp((s) => s.appInfo?.version);
   return (
     <div className="welcome">
-      <h1>KSDB Studio</h1>
+      <h1>
+        KSDB Studio <span className="hint" style={{ fontSize: 14, fontWeight: 400, marginLeft: 6 }}>{appVersion ? `v${appVersion}` : ''}</span>
+      </h1>
       <p className="lede">
         PostgreSQL, MySQL et MariaDB au même endroit : connexions (y compris via SSH), éditeur SQL, édition des données, structure, import/export et
         sauvegardes.

@@ -1,7 +1,8 @@
-import { CircleSlash, FileCode, FolderOpen, Plus, RefreshCw, Trash2, XOctagon } from 'lucide-react';
+import { CircleSlash, FileCode, FolderOpen, Plus, RefreshCw, Trash2, XOctagon , Loader2} from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import type { HistoryEntry, ProcessInfo, Settings, ThemeId, ToolStatus } from '../../shared/types';
 import { DEFAULT_SCHEDULE, THEMES } from '../themes';
+import { checkUpdatesNow } from '../components/Updates';
 import { api } from '../api';
 import { Field, fmtInt, formatDuration } from '../components/ui';
 import { confirmDialog, newQueryTab, refreshConnections, saveSettings, setState, Tab, toast, useApp } from '../state';
@@ -142,6 +143,8 @@ export function HistoryTab({ active }: { active: boolean }) {
 // ---------- Paramètres ----------
 export function SettingsTab({ active }: { active: boolean }) {
   const settings = useApp((s) => s.settings);
+  const appInfo = useApp((s) => s.appInfo);
+  const checking = useApp((s) => s.updateChecking);
   const [draft, setDraft] = useState<Settings>(settings);
   const [tools, setTools] = useState<ToolStatus[]>([]);
   useEffect(() => setDraft(settings), [settings]);
@@ -266,6 +269,31 @@ export function SettingsTab({ active }: { active: boolean }) {
             ))}
           </tbody>
         </table>
+        <h2>Mises à jour</h2>
+        <div className="form-row" style={{ alignItems: 'center', flexWrap: 'wrap' }}>
+          <span>
+            Version installée : <b>{appInfo?.version ?? '…'}</b>
+          </span>
+          <button className="btn outline" disabled={checking} onClick={() => checkUpdatesNow()}>
+            {checking ? <Loader2 className="spin" /> : <RefreshCw />} Rechercher maintenant
+          </button>
+          <button className="btn" onClick={() => setState({ aboutOpen: true })}>
+            À propos
+          </button>
+        </div>
+        <label className="check" style={{ marginTop: 10 }}>
+          <input type="checkbox" checked={draft.checkUpdates !== false} onChange={(e) => set({ checkUpdates: e.target.checked })} />
+          Me prévenir quand une nouvelle version est publiée (vérifié au démarrage puis toutes les 6 h)
+        </label>
+        {draft.skippedVersion && (
+          <p className="hint" style={{ marginTop: 6 }}>
+            Version ignorée : {draft.skippedVersion}.{' '}
+            <a href="#" style={{ color: 'var(--accent)' }} onClick={(e) => (e.preventDefault(), set({ skippedVersion: undefined }))}>
+              Annuler
+            </a>
+          </p>
+        )}
+
         <h2>Connexions</h2>
         <div className="form-row">
           <button

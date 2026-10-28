@@ -22,12 +22,12 @@ Lance `KSDB-Studio-Setup-<version>.exe`. L’application n’est pas signée : W
 
 ```bash
 # Debian / Ubuntu
-sudo apt install ./KSDB-Studio-1.3.0-linux-amd64.deb
+sudo apt install ./KSDB-Studio-1.4.0-linux-amd64.deb
 ksdb-studio
 
 # AppImage (toutes distributions)
-chmod +x KSDB-Studio-1.3.0-linux-x86_64.AppImage
-./KSDB-Studio-1.3.0-linux-x86_64.AppImage
+chmod +x KSDB-Studio-1.4.0-linux-x86_64.AppImage
+./KSDB-Studio-1.4.0-linux-x86_64.AppImage
 # Ubuntu 22.04+ : sudo apt install libfuse2t64   (ou libfuse2)
 # Erreur « sandbox » sur Ubuntu 24.04 : ajouter --no-sandbox
 ```
@@ -47,6 +47,7 @@ chmod +x KSDB-Studio-1.3.0-linux-x86_64.AppImage
 | Import / export | Export de table complète en CSV, TSV, JSON, SQL INSERT ; export des résultats ; **import CSV** (séparateur détecté, encodage, correspondance des colonnes, transaction unique) |
 | Sauvegarde | **Dump / restauration** via pg_dump, pg_restore, psql, mysqldump, mysql (détectés automatiquement), y compris à travers un tunnel SSH ou un VPN |
 | Serveur | Sessions actives, annulation de requête, fin de session |
+| Mises à jour | Version affichée (barre d’état, À propos) ; vérification des nouvelles releases GitHub au démarrage puis toutes les 6 h ; notification système ; téléchargement du bon fichier (installateur Windows, AppImage, .deb) avec installation en un clic sous Windows et AppImage ; « ignorer cette version » |
 | Thèmes | **Papier** (clair chaud) et **Nuit douce** (sombre chaud, peu de bleu) pour le confort visuel, plus Clair et Sombre ; bascule **selon l’heure** ou selon le système |
 
 | | |
@@ -77,6 +78,12 @@ Windows demande une autorisation administrateur (UAC) à chaque démarrage ou ar
 
 `pg_dump` doit être de la même version majeure que le serveur, ou plus récente. Un chemin précis se règle dans **Paramètres → Outils de sauvegarde**.
 
+## Publier une version
+
+1. Mettre à jour `version` dans `package.json` et pousser sur `main`.
+2. Sur GitHub : **Releases → Draft a new release**, tag `vX.Y.Z` (identique à `package.json`), cible `main`, notes de version en markdown, **Publish release**.
+3. GitHub Actions compile Windows et Linux et joint les fichiers à la release. Les installations existantes sont prévenues automatiquement.
+
 ## Développement
 
 Prérequis : Node.js 22.
@@ -88,6 +95,7 @@ npm run typecheck
 npm start            # build + lancement
 npm run test:engine  # tests d'intégration sur de vraies bases PostgreSQL / MariaDB
 npm run test:vpn     # pilotage WireGuard (commandes système simulées, Windows + Linux)
+npm run test:update  # détection et téléchargement des mises à jour
 npm run dist:linux   # AppImage + .deb dans release/
 npm run dist:win     # installateur Windows dans release/
 ```

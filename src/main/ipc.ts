@@ -1,5 +1,5 @@
 // Points d'entrée IPC exposés à l'interface.
-import { BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, Notification, shell } from 'electron';
 import crypto from 'node:crypto';
 import fs from 'node:fs';
 import path from 'node:path';
@@ -19,6 +19,8 @@ import type {
   RowChange,
   Settings,
   GroupSettings,
+  AppInfo,
+  UpdateInfo,
   VpnProfile,
 } from '../shared/types';
 import { ConnectionManager } from './connections';
@@ -26,6 +28,7 @@ import { makeWriter, previewCsv, readCsvBatches } from './csv';
 import { friendlyError, PageOptions } from './drivers/base';
 import { encryptNavicat, parseNcx } from './navicat';
 import { dataDir, Store } from './store';
+import { checkForUpdate, download, installKind, RELEASES_URL } from './update';
 import { parseWgConfig, suggestTunnelName, TUNNEL_NAME_RE, VpnManager } from './vpn';
 import { dump, Job, restore, toolStatus } from './tools';
 
@@ -409,6 +412,96 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
       j.child?.kill();
     }
   });
+
+  // ---------- Version et mises à jour ----------
+  const emitUpdate = (payload: unknown) => getWindow()?.webContents.send('app:update', payload);
+  let lastUpdate: UpdateInfo | null = null;
+  let downloadAbort: AbortController | null = null;
+
+  handle('app:info', (): AppInfo => ({
+    version: app.getVersion(),
+    platform: process.platform,
+    arch: process.arch,
+    electron: process.versions.electron,
+    chrome: process.versions.chrome,
+    node: process.versions.node,
+    installKind: installKind(),
+    dataDir: dataDir(),
+    releasesUrl: RELEASES_URL,
+  }));
+
+  /** manual = clic de l'utilisateur : on répond même si la version a été ignorée */
+  const runCheck = async (manual: boolean) => {
+    const info = await checkForUpdate(app.getVersion());
+    lastUpdate = info;
+    const s = store.settings();
+    if (!manual && info?.available && s.skippedVersion !== info.latest) {
+      emitUpdate(info);
+      if (!manual && Notification.isSupported()) {
+        const n = new Notification({
+          title: `KSDB Studio ${info.latest} est disponible`,
+          body: `Tu utilises la version ${info.current}. Clique pour voir les nouveautés.`,
+        });
+        n.on('click', () => {
+          const w = getWindow();
+          if (w) {
+            if (w.isMinimized()) w.restore();
+            w.focus();
+            emitUpdate({ ...info, open: true });
+          }
+        });
+        n.show();
+      }
+    }
+    return info;
+  };
+
+  handle('app:checkUpdate', () => runCheck(true));
+  handle('app:lastUpdate', () => lastUpdate);
+  handle('app:downloadUpdate', async () => {
+    if (!lastUpdate?.asset) throw new Error('Aucun fichier à télécharger pour ce système : ouvre la page de la release.');
+    const dest = path.join(app.getPath('downloads'), lastUpdate.asset.name);
+    downloadAbort?.abort();
+    downloadAbort = new AbortController();
+    const file = await download(
+      lastUpdate.asset.url,
+      dest,
+      (done, total) => emitUpdate({ progress: { done, total } }),
+      downloadAbort.signal,
+    );
+    downloadAbort = null;
+    return file;
+  });
+  handle('app:cancelDownload', () => downloadAbort?.abort());
+  handle('app:installUpdate', async (file: string) => {
+    const kind = installKind();
+    if (kind === 'windows') {
+      // l'installateur NSIS remplace l'application : on le lance puis on quitte
+      const err = await shell.openPath(file);
+      if (err) throw new Error(err);
+      setTimeout(() => app.quit(), 800);
+      return 'started';
+    }
+    if (kind === 'appimage' && process.env.APPIMAGE) {
+      // remplacer l'AppImage en place puis relancer
+      const target = process.env.APPIMAGE;
+      fs.copyFileSync(file, target + '.new');
+      fs.chmodSync(target + '.new', 0o755);
+      fs.renameSync(target + '.new', target);
+      app.relaunch({ execPath: target, args: process.argv.slice(1) });
+      setTimeout(() => app.exit(0), 300);
+      return 'relaunch';
+    }
+    shell.showItemInFolder(file);
+    return 'manual';
+  });
+
+  // vérification automatique : 10 s après le démarrage puis toutes les 6 h
+  const auto = () => {
+    if (store.settings().checkUpdates !== false) runCheck(false).catch(() => {});
+  };
+  setTimeout(auto, 10_000);
+  setInterval(auto, 6 * 3600_000);
 
   return {
     shutdown: async () => {

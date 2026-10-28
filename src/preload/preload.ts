@@ -17,5 +17,10 @@ contextBridge.exposeInMainWorld('ksdb', {
     ipcRenderer.on('vpn:event', listener);
     return () => ipcRenderer.removeListener('vpn:event', listener);
   },
+  onUpdate: (cb: (ev: unknown) => void) => {
+    const listener = (_e: IpcRendererEvent, ev: unknown) => cb(ev);
+    ipcRenderer.on('app:update', listener);
+    return () => ipcRenderer.removeListener('app:update', listener);
+  },
   platform: process.platform,
 });
