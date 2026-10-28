@@ -23,6 +23,7 @@ const builds = [
   { ...common, entryPoints: ['src/test/vpn.test.ts'], outfile: 'dist/test/vpn.test.js' },
   { ...common, entryPoints: ['src/test/update.test.ts'], outfile: 'dist/test/update.test.js' },
   { ...common, entryPoints: ['src/test/compare.test.ts'], outfile: 'dist/test/compare.test.js' },
+  { ...common, entryPoints: ['src/test/transfer.test.ts'], outfile: 'dist/test/transfer.test.js' },
 ];
 
 if (watch) {

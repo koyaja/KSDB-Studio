@@ -45,6 +45,7 @@ chmod +x KSDB-Studio-1.5.2-linux-x86_64.AppImage
 | Structure | Colonnes, index, clés étrangères, DDL ; **concepteur de table** (création et modification) avec le SQL généré visible |
 | Diagramme ERD | Diagramme automatique d’un schéma (tables, colonnes, PK/FK, nombre de lignes, relations en pattes de corbeau) ; zoom, déplacement, tables repositionnables (positions mémorisées) ; clic pour mettre en évidence les relations ; recherche ; affichage complet / clés / noms ; requête avec jointures générée ; export **PNG** et **SVG** |
 | Comparaison de schémas | Source ↔ cible (bases, schémas, connexions différentes, ex. dev → prod) : tables, colonnes, clés primaires, index, contraintes UNIQUE, clés étrangères, commentaires, vues, vues matérialisées, fonctions, procédures, triggers ; détail des différences et avertissements (perte de données, NOT NULL…) ; **script de migration** ordonné (FK, vues dépendantes supprimées puis recréées dans l’ordre) ; suppressions décochées par défaut ; ouvrir dans l’éditeur, enregistrer en .sql ou **appliquer sur la cible** (transaction sous PostgreSQL) |
+| Transfert de données | Copie de tables entre bases, schémas ou **serveurs différents**, y compris **PostgreSQL ↔ MySQL/MariaDB** (tunnels SSH et VPN compris) : lecture en flux, insertion par lots, ordre des clés étrangères ; création ou recréation des tables (même moteur), vidage préalable, filtre WHERE par table, doublons ignorés, séquences recalées ; une transaction par table, progression en direct et arrêt possible |
 | Import / export | Export de table complète en CSV, TSV, JSON, SQL INSERT ; export des résultats ; **import CSV** (séparateur détecté, encodage, correspondance des colonnes, transaction unique) |
 | Sauvegarde | **Dump / restauration** via pg_dump, pg_restore, psql, mysqldump, mysql (détectés automatiquement), y compris à travers un tunnel SSH ou un VPN |
 | Serveur | Sessions actives, annulation de requête, fin de session |
@@ -57,6 +58,7 @@ chmod +x KSDB-Studio-1.5.2-linux-x86_64.AppImage
 | ![Concepteur de table](docs/screenshots/concepteur.png) | ![Sauvegarde avec pg_dump](docs/screenshots/sauvegarde.png) |
 | ![Diagramme ERD](docs/screenshots/erd.png) | ![Diagramme ERD, relations en évidence](docs/screenshots/erd-selection.png) |
 | ![Comparaison de schémas](docs/screenshots/comparaison.png) | ![Application du script de synchronisation](docs/screenshots/comparaison-application.png) |
+| ![Transfert MariaDB → MariaDB avec création des tables](docs/screenshots/transfert.png) | ![Transfert PostgreSQL → MariaDB filtré](docs/screenshots/transfert-pg-mariadb.png) |
 
 ## Migrer depuis Navicat
 
@@ -70,6 +72,20 @@ chmod +x KSDB-Studio-1.5.2-linux-x86_64.AppImage
 2. Choisis la **cible** (celle à mettre à jour, par exemple prod), sur la même connexion ou une autre, puis **Comparer**.
 3. Coche les objets à synchroniser. Les suppressions (tables, colonnes, vues absentes de la source) sont décochées par défaut.
 4. **Voir le script**, **Ouvrir dans l’éditeur**, **Enregistrer** en .sql, ou **Appliquer sur la cible**. Sous PostgreSQL le script s’exécute dans une transaction ; sous MySQL les instructions de structure sont validées une à une : fais une sauvegarde avant.
+
+## Transférer des données entre serveurs
+
+1. Clic droit sur un schéma (PostgreSQL), une base (MySQL / MariaDB) ou une table → **Transférer les données…** : c’est la **source**.
+2. Choisis la **cible** : même serveur ou autre serveur, même moteur ou non.
+3. Coche les tables ; l’icône d’entonnoir ajoute un filtre `WHERE` à une table.
+4. Structure :
+   - **Tables existantes** : copie dans les tables déjà présentes, colonnes associées par nom (seul mode possible entre PostgreSQL et MySQL) ;
+   - **Créer les manquantes** : crée les tables absentes avec leurs index, puis les clés étrangères après les données ;
+   - **Supprimer et recréer** : remplace les tables de la cible par celles de la source.
+5. Options : vider avant, ignorer les doublons, recaler séquences et auto-incréments, désactiver les contraintes, continuer après une erreur, taille des lots.
+6. **Transférer**. Chaque table est copiée dans sa propre transaction : une table en erreur reste dans son état d’origine.
+
+Entre moteurs, les valeurs sont converties : booléens, JSON, dates avec fuseau horaire (converties dans le fuseau de la connexion MySQL), binaires.
 
 ## VPN WireGuard
 
@@ -108,6 +124,7 @@ npm run test:engine  # tests d'intégration sur de vraies bases PostgreSQL / Mar
 npm run test:vpn     # pilotage WireGuard (commandes système simulées, Windows + Linux)
 npm run test:update  # détection et téléchargement des mises à jour
 npm run test:compare # comparaison de schémas : diff → script appliqué → nouveau diff vide (PG + MariaDB)
+npm run test:transfer # transfert de données : PG → PG, MariaDB → MariaDB, PG ↔ MariaDB
 npm run dist:linux   # AppImage + .deb dans release/
 npm run dist:win     # installateur Windows dans release/
 ```
@@ -126,6 +143,7 @@ src/
     connections.ts pools, sessions par onglet, tunnel SSH, démarrage du VPN
     tunnel.ts      ssh2 → port local
     vpn.ts         WireGuard : wireguard.exe (UAC) / nmcli / wg-quick
+    transfer.ts    transfert de données entre connexions (flux, lots, ordre des FK)
     tools.ts       pg_dump / pg_restore / psql / mysqldump / mysql
     navicat.ts     import .ncx (AES-128-CBC Navicat 12+)
     csv.ts         lecture / écriture CSV en flux
@@ -139,7 +157,6 @@ Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studi
 
 ## Feuille de route
 
-- Transfert de données entre serveurs
 - Gestion des utilisateurs et des droits
 - Plan EXPLAIN visuel
 - Sauvegardes planifiées

@@ -293,9 +293,11 @@ export interface ExportTableOptions {
 
 export interface JobEvent {
   jobId: string;
-  kind: 'log' | 'progress' | 'done' | 'error';
+  kind: 'log' | 'progress' | 'done' | 'error' | 'data';
   message?: string;
   progress?: number;
+  /** charge utile structurée (transfert de données) */
+  data?: unknown;
 }
 
 export interface ToolStatus {
@@ -365,3 +367,32 @@ export interface AppInfo {
   dataDir: string;
   releasesUrl: string;
 }
+
+// ---------- Transfert de données ----------
+
+export interface TransferEndpoint {
+  connectionId: string;
+  database: string;
+  /** schéma PG ; pour MySQL, identique à la base */
+  schema: string;
+}
+
+export interface TransferOptions {
+  source: TransferEndpoint;
+  target: TransferEndpoint;
+  tables: { name: string; where?: string }[];
+  /** existing : tables déjà présentes ; create : créer les manquantes ; recreate : supprimer puis recréer */
+  structure: 'existing' | 'create' | 'recreate';
+  data: boolean;
+  before: 'append' | 'truncate';
+  onConflict: 'error' | 'ignore';
+  resetSequences: boolean;
+  disableChecks: boolean;
+  continueOnError: boolean;
+  batchSize: number;
+}
+
+export type TransferEvent =
+  | { type: 'table'; table: string; state: 'pending' | 'running' | 'done' | 'error' | 'skipped'; rows?: number; error?: string; note?: string }
+  | { type: 'log'; level: 'info' | 'warn' | 'error'; message: string }
+  | { type: 'summary'; tables: number; rows: number; errors: number; seconds: number };

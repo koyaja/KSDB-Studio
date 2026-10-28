@@ -1,6 +1,7 @@
 // Accès typé au process principal.
 import type { SchemaSnapshot } from '../shared/schemadiff';
 import type {
+  TransferOptions,
   ApiResult,
   CellValue,
   ColumnInfo,
@@ -164,6 +165,7 @@ export const api = {
   importCsv: (o: ImportCsvOptions) => call<string>('job:importCsv', o),
   dump: (o: DumpOptions) => call<string>('job:dump', o),
   restore: (o: RestoreOptions) => call<string>('job:restore', o),
+  transfer: (o: TransferOptions) => call<string>('job:transfer', o),
   cancelJob: (jobId: string) => call<void>('job:cancel', jobId),
 };
 

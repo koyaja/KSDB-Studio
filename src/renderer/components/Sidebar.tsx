@@ -16,6 +16,7 @@ import {
   Loader2,
   Network,
   GitCompareArrows,
+  ArrowRightLeft,
   Pencil,
   Plug,
   Plus,
@@ -136,6 +137,16 @@ function openCompare(connectionId: string, database: string, schema: string) {
     kind: 'compare',
     source: { connectionId, database, schema },
     target: { connectionId, database: '', schema: '' },
+  });
+}
+
+export function openTransfer(connectionId: string, database: string, schema: string, tables?: string[]) {
+  openTab({
+    id: uid(),
+    kind: 'transfer',
+    source: { connectionId, database, schema },
+    target: { connectionId: null, database: '', schema: '' },
+    tables,
   });
 }
 
@@ -407,6 +418,7 @@ function DatabaseNode({ conn, db }: { conn: ListedConnection; db: string }) {
         ? [
             { label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema: db }) },
             { label: 'Comparer avec…', icon: <GitCompareArrows />, onClick: () => openCompare(conn.id, db, db) },
+            { label: 'Transférer les données…', icon: <ArrowRightLeft />, onClick: () => openTransfer(conn.id, db, db) },
           ]
         : []),
       ...(isMy ? [{ label: 'Nouvelle table', icon: <FilePlus2 />, onClick: () => openTab({ id: uid(), kind: 'designer', connectionId: conn.id, database: db, schema: db, table: null }) }] : []),
@@ -480,6 +492,7 @@ function SchemaNode({ conn, db, schema }: { conn: ListedConnection; db: string; 
       { label: 'Nouvelle requête', icon: <FileCode />, onClick: () => newQueryTab(conn.id, db, `SET search_path TO ${quoteIdent('postgres', schema)};\n\n`) },
       { label: 'Diagramme ERD', icon: <Network />, onClick: () => openTab({ id: uid(), kind: 'erd', connectionId: conn.id, database: db, schema }) },
       { label: 'Comparer avec…', icon: <GitCompareArrows />, onClick: () => openCompare(conn.id, db, schema) },
+      { label: 'Transférer les données…', icon: <ArrowRightLeft />, onClick: () => openTransfer(conn.id, db, schema) },
       { label: 'Nouvelle table', icon: <FilePlus2 />, onClick: () => openTab({ id: uid(), kind: 'designer', connectionId: conn.id, database: db, schema, table: null }) },
       { label: 'Actualiser', icon: <RefreshCw />, onClick: () => bumpTree(key) },
       { label: 'Copier le nom', icon: <Copy />, onClick: () => copyText(schema) },
@@ -601,6 +614,7 @@ function ObjectNode(props: { conn: ListedConnection; db: string; schema: string;
       );
       if (obj.type === 'table') items.push({ label: 'Importer un CSV…', icon: <FileInput />, onClick: () => openTab({ id: uid(), kind: 'import', connectionId: conn.id, database: db, schema, table: obj.name }) });
       items.push({ label: 'Exporter…', icon: <FileDown />, onClick: () => openExport({ connectionId: conn.id, database: db, schema, table: obj.name }) });
+      if (obj.type === 'table') items.push({ label: 'Transférer vers…', icon: <ArrowRightLeft />, onClick: () => openTransfer(conn.id, db, schema, [obj.name]) });
       if (obj.type === 'table')
         items.push({
           label: 'Sauvegarder cette table…',

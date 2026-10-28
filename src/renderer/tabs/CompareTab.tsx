@@ -42,7 +42,7 @@ function StatusIcon({ s }: { s: DiffItem['status'] }) {
   return s === 'added' ? <Plus {...p} /> : s === 'removed' ? <Minus {...p} /> : <Pencil {...p} />;
 }
 
-function SidePicker({ label, side, onChange, kind }: { label: string; side: Side; onChange: (s: Side) => void; kind?: string }) {
+export function SidePicker({ label, side, onChange, kind }: { label: string; side: Side; onChange: (s: Side) => void; kind?: string }) {
   const connections = useApp((s) => s.connections);
   const conn = connections.find((c) => c.id === side.connectionId);
   const [dbs, setDbs] = useState<string[]>([]);

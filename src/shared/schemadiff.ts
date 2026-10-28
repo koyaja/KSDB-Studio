@@ -14,6 +14,8 @@ export interface SnapColumn {
   comment: string | null;
   /** MySQL : définition complète de la colonne (après le nom) */
   def?: string;
+  /** colonne calculée (GENERATED ... AS (...)) : jamais insérée */
+  generated?: boolean;
 }
 
 export interface SnapIndex {
@@ -240,6 +242,10 @@ function pgColumnDef(c: SnapColumn, forCreate: boolean): string {
     }
   }
   let s = `${qid('postgres', c.name)} ${type}`;
+  if (c.generated && c.default) {
+    const expr = c.default.startsWith('(') ? c.default : `(${c.default})`;
+    return `${s} GENERATED ALWAYS AS ${expr} STORED${c.nullable ? '' : ' NOT NULL'}`;
+  }
   if (c.identity) s += ` GENERATED ${c.identity === 'a' ? 'ALWAYS' : 'BY DEFAULT'} AS IDENTITY`;
   else if (def !== null) s += ` DEFAULT ${def}`;
   if (!c.nullable) s += ' NOT NULL';
@@ -335,6 +341,13 @@ function alterTableItem(kind: DbKind, s: SnapTable, t: SnapTable, T: string, qt:
         details.push(`~ colonne ${c.name} : ${o.def} → ${c.def}`);
         alter.push(`ALTER TABLE ${table} MODIFY COLUMN ${q(c.name)} ${c.def}`);
       }
+    } else if (!!c.generated !== !!o.generated || (c.generated && normDefault(o.default) !== normDefault(c.default))) {
+      // colonne calculée : pas d'ALTER possible, on la recrée
+      details.push(`~ ${c.name} : ${c.generated ? `calculée ${c.default}` : 'colonne normale'} (recréée)`);
+      if (!o.generated) warnings.push(`${c.name} devient une colonne calculée : ses valeurs actuelles sont perdues`);
+      alter.push(`ALTER TABLE ${table} DROP COLUMN ${q(c.name)}`);
+      alter.push(`ALTER TABLE ${table} ADD COLUMN ${pgColumnDef(c, true)}`);
+      breaksViews = true;
     } else {
       const n = q(c.name);
       if (o.type !== c.type) {

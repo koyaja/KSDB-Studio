@@ -15,6 +15,7 @@ import {
   Monitor,
   Network,
   GitCompareArrows,
+  ArrowRightLeft,
   Sun,
   Table2,
   Upload,
@@ -35,6 +36,7 @@ import { HistoryTab, openSettings, ProcessesTab, SettingsTab } from './tabs/Misc
 import { QueryTab } from './tabs/QueryTab';
 import { ErdTab } from './tabs/ErdTab';
 import { CompareTab } from './tabs/CompareTab';
+import { TransferTab } from './tabs/TransferTab';
 import { TableTab } from './tabs/TableTab';
 import {
   closeTab,
@@ -69,6 +71,10 @@ function tabTitle(t: Tab): string {
       return `Import → ${t.table}`;
     case 'processes':
       return `Processus · ${connectionById(t.connectionId)?.name ?? ''}`;
+    case 'transfer': {
+      const d = (x: { database: string; schema: string }) => (x.schema !== x.database ? `${x.database}.${x.schema}` : x.database);
+      return `Transfert ${t.source.database ? d(t.source) : ''}${t.target.database ? ' → ' + d(t.target) : ''}`;
+    }
     case 'compare':
       return `Comparer ${t.source.database ? (t.source.schema !== t.source.database ? `${t.source.database}.${t.source.schema}` : t.source.database) : ''}${t.target.database ? ' → ' + (t.target.schema !== t.target.database ? `${t.target.database}.${t.target.schema}` : t.target.database) : ''}`;
     case 'erd':
@@ -95,6 +101,8 @@ function tabIcon(t: Tab) {
       return <FileInput {...p} />;
     case 'processes':
       return <Activity {...p} />;
+    case 'transfer':
+      return <ArrowRightLeft {...p} style={{ color: 'var(--accent)' }} />;
     case 'compare':
       return <GitCompareArrows {...p} style={{ color: 'var(--accent)' }} />;
     case 'erd':
@@ -349,6 +357,8 @@ export function App() {
                   return <ImportTab key={t.id} tab={t} active={active} />;
                 case 'compare':
                   return <CompareTab key={t.id} tab={t} active={active} />;
+                case 'transfer':
+                  return <TransferTab key={t.id} tab={t} active={active} />;
                 case 'erd':
                   return <ErdTab key={t.id} tab={t} active={active} />;
                 case 'processes':

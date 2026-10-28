@@ -23,6 +23,7 @@ import type {
 } from '../../shared/types';
 import {
   Batch,
+  BulkOptions,
   CompletionSchema,
   Driver,
   Endpoint,
@@ -367,10 +368,11 @@ export class PostgresDriver implements Driver {
          join pg_namespace n on n.oid = c.relnamespace where ${rel} order by 1`,
         [schema],
       ),
-      this.q<{ t: string; name: string; type: string; nullable: boolean; def: string | null; ident: string; comment: string | null }>(
+      this.q<{ t: string; name: string; type: string; nullable: boolean; def: string | null; ident: string; comment: string | null; gen: string }>(
         db,
         `select c.relname t, a.attname as name, format_type(a.atttypid, a.atttypmod) as type, not a.attnotnull as nullable,
-                pg_get_expr(d.adbin, d.adrelid) as def, a.attidentity::text as ident, col_description(a.attrelid, a.attnum) as comment
+                pg_get_expr(d.adbin, d.adrelid) as def, a.attidentity::text as ident, col_description(a.attrelid, a.attnum) as comment,
+                a.attgenerated::text as gen
          from pg_attribute a join pg_class c on c.oid = a.attrelid join pg_namespace n on n.oid = c.relnamespace
          left join pg_attrdef d on d.adrelid = a.attrelid and d.adnum = a.attnum
          where ${rel} and a.attnum > 0 and not a.attisdropped order by c.relname, a.attnum`,
@@ -464,6 +466,7 @@ export class PostgresDriver implements Driver {
         default: c.def === null ? null : norm(c.def),
         identity: c.ident ?? '',
         comment: c.comment,
+        generated: !!c.gen,
       })),
       pk: pkBy.has(t.t) ? { name: pkBy.get(t.t)!.name, columns: pkBy.get(t.t)!.cols } : null,
       indexes: (idxBy.get(t.t) ?? [])
@@ -809,7 +812,7 @@ export class PostgresDriver implements Driver {
     await this.q(undefined, `select ${fn}($1::int)`, [id]);
   }
 
-  async *iterate(db: string, sql: string, batchSize: number): AsyncGenerator<Batch> {
+  async *iterate(db: string, sql: string, batchSize: number, raw = false): AsyncGenerator<Batch> {
     const client = new pg.Client(await this.clientConfig(db || this.defaultDb()));
     await client.connect();
     try {
@@ -823,7 +826,7 @@ export class PostgresDriver implements Driver {
           fields = await this.fieldsOf(db, ((cursor as any)._result?.fields ?? []) as never[]);
         }
         if (!rows.length) break;
-        yield { fields, rows: rows.map(normalizeRow) };
+        yield { fields, rows: raw ? (rows as CellValue[][]) : rows.map(normalizeRow) };
         if (rows.length < batchSize) break;
       }
       await cursor.close();
@@ -838,8 +841,8 @@ export class PostgresDriver implements Driver {
     schema: string,
     table: string,
     columns: string[],
-    batches: AsyncIterable<CellValue[][]>,
-    opts: { truncate: boolean; onProgress?: (n: number) => void },
+    batches: AsyncIterable<unknown[][]>,
+    opts: BulkOptions,
   ): Promise<number> {
     const client = new pg.Client(await this.clientConfig(db || this.defaultDb()));
     await client.connect();
@@ -849,13 +852,16 @@ export class PostgresDriver implements Driver {
     let total = 0;
     try {
       await client.query('BEGIN');
+      if (opts.disableChecks) await client.query(`SET LOCAL session_replication_role = replica`);
       if (opts.truncate) await client.query(`TRUNCATE TABLE ${t}`);
+      const head = `INSERT INTO ${t} (${colSql})${opts.overriding ? ' OVERRIDING SYSTEM VALUE' : ''} VALUES `;
+      const tail = opts.onConflict === 'ignore' ? ' ON CONFLICT DO NOTHING' : '';
       for await (const batch of batches) {
         for (let i = 0; i < batch.length; i += maxRowsPerStmt) {
           const chunk = batch.slice(i, i + maxRowsPerStmt);
           const params: unknown[] = [];
           const tuples = chunk.map((row) => '(' + row.map((v) => (params.push(v), `$${params.length}`)).join(', ') + ')');
-          await client.query(`INSERT INTO ${t} (${colSql}) VALUES ${tuples.join(', ')}`, params);
+          await client.query(head + tuples.join(', ') + tail, params);
           total += chunk.length;
           opts.onProgress?.(total);
         }

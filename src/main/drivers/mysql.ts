@@ -20,7 +20,7 @@ import type {
   TablePage,
   TableStructure,
 } from '../../shared/types';
-import { Batch, CompletionSchema, Driver, Endpoint, friendlyError, normalizeRow, normalizeValue, PageOptions } from './base';
+import { Batch, BulkOptions, CompletionSchema, Driver, Endpoint, friendlyError, normalizeRow, normalizeValue, PageOptions } from './base';
 const RAW_TYPES = (mysql as unknown as { Types: Record<number, string> }).Types;
 const FRIENDLY: Record<string, string> = {
   DECIMAL: 'decimal', NEWDECIMAL: 'decimal', TINY: 'tinyint', SHORT: 'smallint', LONG: 'int', INT24: 'mediumint',
@@ -37,6 +37,15 @@ const TYPE_NAMES = new Proxy({} as Record<number, string>, {
 });
 
 import { normalizeSchema, SchemaSnapshot, SnapObject, SnapTable } from '../../shared/schemadiff';
+
+/** Valeur passée à mysql2 : binaire conservé, objets / tableaux en JSON, BigInt en texte. */
+function mysqlParam(v: unknown): unknown {
+  if (v === null || v === undefined) return null;
+  if (Buffer.isBuffer(v) || v instanceof Date) return v;
+  if (typeof v === 'bigint') return v.toString();
+  if (typeof v === 'object') return JSON.stringify(v);
+  return v;
+}
 
 const unq = (s: string) => s.replace(/^`|`$/g, '').replace(/``/g, '`');
 const colList = (s: string) => (s.match(/`(?:[^`]|``)+`/g) ?? []).map(unq);
@@ -60,6 +69,7 @@ export function parseMysqlCreate(name: string, sql: string): SnapTable {
         identity: '',
         comment: null,
         def,
+        generated: /\bGENERATED ALWAYS AS\b|\b(VIRTUAL|STORED|PERSISTENT)\b/i.test(def) && /\bAS\s*\(/i.test(def),
       });
     } else if ((m = /^PRIMARY KEY\s*\((.*)\)/i.exec(line))) {
       t.pk = { name: 'PRIMARY', columns: colList(m[1]) };
@@ -642,7 +652,7 @@ export class MysqlDriver implements Driver {
     await this.q(undefined, `KILL ${mode === 'cancel' ? 'QUERY ' : ''}${Number(id)}`);
   }
 
-  async *iterate(db: string, sql: string, batchSize: number): AsyncGenerator<Batch> {
+  async *iterate(db: string, sql: string, batchSize: number, raw = false): AsyncGenerator<Batch> {
     const conn = mysql.createConnection(await this.options(db));
     try {
       const q = conn.query({ sql, rowsAsArray: true });
@@ -653,7 +663,7 @@ export class MysqlDriver implements Driver {
       });
       let batch: CellValue[][] = [];
       for await (const row of stream as AsyncIterable<unknown[]>) {
-        batch.push(normalizeRow(row));
+        batch.push(raw ? (row as CellValue[]) : normalizeRow(row));
         if (batch.length >= batchSize) {
           yield { fields, rows: batch };
           batch = [];
@@ -670,20 +680,22 @@ export class MysqlDriver implements Driver {
     _schema: string,
     table: string,
     columns: string[],
-    batches: AsyncIterable<CellValue[][]>,
-    opts: { truncate: boolean; onProgress?: (n: number) => void },
+    batches: AsyncIterable<unknown[][]>,
+    opts: BulkOptions,
   ): Promise<number> {
     const conn = mysql.createConnection(await this.options(db)).promise();
     const t = this.qualified(db, table);
     const colSql = columns.map((c) => this.quoteIdent(c)).join(', ');
     let total = 0;
     try {
+      if (opts.disableChecks) await conn.query('SET FOREIGN_KEY_CHECKS = 0');
       await conn.beginTransaction();
       if (opts.truncate) await conn.query(`DELETE FROM ${t}`);
+      const verb = opts.onConflict === 'ignore' ? 'INSERT IGNORE' : 'INSERT';
       for await (const batch of batches) {
         for (let i = 0; i < batch.length; i += 500) {
           const chunk = batch.slice(i, i + 500);
-          await conn.query(`INSERT INTO ${t} (${colSql}) VALUES ?`, [chunk.map((r) => r.map(normalizeValue))]);
+          await conn.query(`${verb} INTO ${t} (${colSql}) VALUES ?`, [chunk.map((r) => r.map(mysqlParam))]);
           total += chunk.length;
           opts.onProgress?.(total);
         }

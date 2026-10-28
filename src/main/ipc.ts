@@ -21,6 +21,7 @@ import type {
   GroupSettings,
   AppInfo,
   UpdateInfo,
+  TransferOptions,
   VpnProfile,
 } from '../shared/types';
 import { ConnectionManager } from './connections';
@@ -31,6 +32,7 @@ import { dataDir, Store } from './store';
 import { checkForUpdate, download, installKind, RELEASES_URL } from './update';
 import { parseWgConfig, suggestTunnelName, TUNNEL_NAME_RE, VpnManager } from './vpn';
 import { dump, Job, restore, toolStatus } from './tools';
+import { runTransfer } from './transfer';
 
 export function registerIpc(store: Store, getWindow: () => BrowserWindow | null) {
   const emitVpn = (payload: unknown) => getWindow()?.webContents.send('vpn:event', payload);
@@ -404,6 +406,22 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
       }
       await restore(job, e.cfg, await e.endpoint(), o, store.settings(), sinkFor(jobId));
       return `Restauration terminée dans ${o.database}`;
+    }),
+  );
+  handle('job:transfer', (o: TransferOptions) =>
+    startJob(async (job, jobId) => {
+      const src = await cm.get(o.source.connectionId);
+      const tgt = await cm.get(o.target.connectionId);
+      const r = await runTransfer(o, {
+        src,
+        tgt,
+        id: jobId,
+        cancelled: () => job.cancelled,
+        emit: (data) => emit({ jobId, kind: 'data', data }),
+      });
+      return r.errors
+        ? `Transfert terminé avec ${r.errors} erreur(s) : ${r.rows.toLocaleString('fr-FR')} ligne(s) copiée(s)`
+        : `Transfert terminé : ${r.rows.toLocaleString('fr-FR')} ligne(s) copiée(s)`;
     }),
   );
   handle('job:cancel', (jobId: string) => {

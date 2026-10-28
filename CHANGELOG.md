@@ -3,6 +3,19 @@
 Chaque section `## [X.Y.Z]` devient automatiquement les notes de la release GitHub correspondante,
 affichées aussi dans la fenêtre de mise à jour de KSDB Studio.
 
+## [1.6.0]
+
+### Nouveautés
+- **Transfert de données entre serveurs** : clic droit sur un schéma, une base ou une table → « Transférer les données… »
+  - même serveur ou serveurs différents, tunnels SSH et VPN compris
+  - **PostgreSQL ↔ MySQL / MariaDB** : colonnes associées par nom, valeurs converties (booléens, JSON, dates avec fuseau, binaires)
+  - création des tables manquantes ou recréation complète (même moteur), clés étrangères ajoutées après les données
+  - filtre `WHERE` par table, vidage préalable, doublons ignorés, séquences et auto-incréments recalés
+  - lecture en flux et insertion par lots, une transaction par table, progression en direct, arrêt possible
+
+### Corrections
+- Comparaison de schémas : les colonnes calculées PostgreSQL (`GENERATED ALWAYS AS … STORED`) sont recréées correctement
+
 ## [1.5.2]
 
 ### Corrections

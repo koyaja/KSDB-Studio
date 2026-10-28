@@ -31,6 +31,17 @@ export interface CompletionSchema {
   defaultSchema: string;
 }
 
+export interface BulkOptions {
+  truncate: boolean;
+  onProgress?: (n: number) => void;
+  /** ignorer les lignes en conflit (PG : ON CONFLICT DO NOTHING ; MySQL : INSERT IGNORE) */
+  onConflict?: 'error' | 'ignore';
+  /** PG : OVERRIDING SYSTEM VALUE (colonnes GENERATED ALWAYS AS IDENTITY) */
+  overriding?: boolean;
+  /** MySQL : FOREIGN_KEY_CHECKS = 0 ; PG : session_replication_role = replica (superutilisateur) */
+  disableChecks?: boolean;
+}
+
 export interface Batch {
   fields: ResultField[];
   rows: CellValue[][];
@@ -66,15 +77,16 @@ export interface Driver {
   kill(id: string, mode: 'cancel' | 'terminate'): Promise<void>;
 
   /** Parcourt un SELECT par lots (export). */
-  iterate(db: string, sql: string, batchSize: number): AsyncGenerator<Batch>;
+  /** raw = valeurs brutes du pilote (binaire, tableaux, JSON) pour un transfert fidèle */
+  iterate(db: string, sql: string, batchSize: number, raw?: boolean): AsyncGenerator<Batch>;
   /** Insère des lignes par lots dans une transaction (import CSV). */
   bulkInsert(
     db: string,
     schema: string,
     table: string,
     columns: string[],
-    rows: AsyncIterable<CellValue[][]>,
-    opts: { truncate: boolean; onProgress?: (n: number) => void },
+    rows: AsyncIterable<unknown[][]>,
+    opts: BulkOptions,
   ): Promise<number>;
 
   quoteIdent(name: string): string;

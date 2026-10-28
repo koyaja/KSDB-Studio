@@ -1887,3 +1887,102 @@ table.designer tr.isnew td:first-child {
 .cmp-details li.mod {
   border-color: var(--accent);
 }
+
+/* ---------- Transfert de données ---------- */
+.xf-body {
+  grid-template-columns: minmax(320px, 46%) 1fr;
+}
+.xf-row.off .nm {
+  color: var(--text-2);
+}
+.xf-row .btn.tiny {
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  opacity: 0.45;
+}
+.xf-row:hover .btn.tiny,
+.xf-row .btn.tiny.on {
+  opacity: 1;
+}
+.xf-row .btn.tiny.on svg {
+  color: var(--accent);
+}
+.xf-row .btn.tiny svg {
+  width: 13px;
+  height: 13px;
+}
+.xf-tag {
+  font-size: 10.5px;
+  padding: 1px 6px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--ochre) 20%, transparent);
+  color: var(--ochre);
+  white-space: nowrap;
+}
+.xf-tag.where {
+  background: color-mix(in srgb, var(--accent) 16%, transparent);
+  color: var(--accent);
+}
+.xf-ico {
+  width: 15px;
+  height: 15px;
+  flex: none;
+}
+.xf-ico.ok {
+  color: var(--ok);
+}
+.xf-ico.err {
+  color: var(--danger);
+}
+.xf-ico.run {
+  color: var(--accent);
+}
+.xf-ico.pend,
+.xf-ico.skip {
+  color: var(--text-3, var(--text-2));
+  opacity: 0.6;
+}
+.xf-where {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 10px 6px 34px;
+}
+.xf-where .input {
+  flex: 1;
+}
+.xf-err,
+.xf-note {
+  margin: 0 10px 6px 34px;
+  font-size: 11.5px;
+  white-space: pre-wrap;
+  color: var(--danger);
+}
+.xf-note {
+  color: var(--text-2);
+}
+.xf-opts h3 {
+  margin: 16px 0 8px;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  color: var(--text-2);
+}
+.xf-opts h3:first-child {
+  margin-top: 0;
+}
+.xf-opts .check {
+  display: flex;
+  width: fit-content;
+  margin: 7px 0;
+}
+.xf-help {
+  margin: 6px 0 0;
+  font-size: 11.5px;
+  line-height: 1.45;
+}
+.seg button:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
