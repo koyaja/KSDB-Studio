@@ -1,4 +1,4 @@
-// Tests du pilotage WireGuard avec des commandes système simulées (Windows + Linux).
+// Tests du pilotage WireGuard avec des commandes système simulées (Windows, Linux, macOS).
 import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import os from 'node:os';
@@ -121,6 +121,46 @@ function fakeWindows(opts: { uacDenied?: boolean; existingDpapi?: boolean } = {}
   return { run, calls, running };
 }
 
+/** macOS simulé : wg-quick (Homebrew) via osascript, tunnels de l'application WireGuard via scutil. */
+function fakeMac(opts: { wgQuick?: boolean; ncTunnels?: string[]; denied?: boolean }) {
+  const calls: string[] = [];
+  const up = new Set<string>();
+  const nc = new Set(opts.ncTunnels ?? []);
+  const ok = (stdout = ''): RunResult => ({ code: 0, stdout, stderr: '' });
+  const exists = (p: string) => {
+    if (/\/(opt\/homebrew|usr\/local)\/bin\/wg-quick$/.test(p)) return !!opts.wgQuick && p.startsWith('/opt/homebrew');
+    const m = /^\/var\/run\/wireguard\/(.+)\.name$/.exec(p);
+    if (m) return up.has(m[1]);
+    return fs.existsSync(p);
+  };
+  const run = async (cmd: string, args: string[]): Promise<RunResult> => {
+    calls.push([cmd, ...args].join(' '));
+    if (cmd === 'scutil' && args[1] === 'list')
+      return ok(['Available network connection services in the current set (*=enabled):', ...[...nc].map((n) => `* (${up.has(n) ? 'Connected' : 'Disconnected'})   9D3A-UUID VPN (com.wireguard.macos) "${n}"   [VPN/com.wireguard.macos]`)].join('\n'));
+    if (cmd === 'scutil' && args[1] === 'status') return ok(up.has(args[2]) ? 'Connected\n' : 'Disconnected\n');
+    if (cmd === 'scutil' && args[1] === 'start') return up.add(args[2]), ok();
+    if (cmd === 'scutil' && args[1] === 'stop') return up.delete(args[2]), ok();
+    if (cmd === 'osascript') {
+      if (opts.denied) return { code: 1, stdout: '', stderr: '0:42: execution error: User canceled. (-128)' };
+      const m = /wg-quick' (up|down) '([^']+)'/.exec(args[1]);
+      assert.ok(m, 'commande wg-quick attendue : ' + args[1]);
+      assert.match(args[1], /with administrator privileges$/);
+      assert.match(args[1], /export PATH=\/opt\/homebrew\/bin/);
+      const name = path.basename(m[2], '.conf');
+      if (m[1] === 'up') {
+        if (m[2].endsWith('.conf')) {
+          assert.ok(fs.existsSync(m[2]));
+          if (process.platform !== 'win32') assert.equal((fs.statSync(m[2]).mode & 0o777).toString(8), '600');
+        }
+        up.add(name);
+      } else up.delete(name);
+      return ok();
+    }
+    return ok();
+  };
+  return { run, exists, calls, up };
+}
+
 async function main() {
   const dataDir = fs.mkdtempSync(path.join(os.tmpdir(), 'ksdb-vpn-test-'));
   const readConfig = () => CONF;
@@ -239,6 +279,35 @@ async function main() {
     f.running.add('externe');
     await vm.stopOwned([a, b, profile({ id: 'c', tunnelName: 'externe', stopOnQuit: true })]);
     assert.deepEqual([...f.running].sort(), ['b', 'externe']);
+  });
+
+  console.log('\nmacOS');
+  await t('fichier .conf : wg-quick via osascript (administrateur), arrêt et nettoyage', async () => {
+    const f = fakeMac({ wgQuick: true });
+    const vm = new VpnManager({ dataDir, readConfig, platform: 'darwin', run: f.run, exists: f.exists, waitMs: 2000 });
+    assert.equal((await vm.backend()).available, true);
+    assert.equal((await vm.start(profile())).state, 'up');
+    assert.equal((await vm.stop(profile())).state, 'down');
+    assert.ok(!fs.existsSync(path.join(dataDir, 'vpn', 'wg-qos.conf')), 'le .conf en clair est supprimé');
+  });
+  await t('tunnel de l’application WireGuard : scutil, sans mot de passe', async () => {
+    const f = fakeMac({ ncTunnels: ['bureau'] });
+    const vm = new VpnManager({ dataDir, readConfig, platform: 'darwin', run: f.run, exists: f.exists, waitMs: 2000 });
+    const p = profile({ mode: 'existing', tunnelName: 'bureau' });
+    assert.equal((await vm.start(p)).state, 'up');
+    assert.ok(f.calls.includes('scutil --nc start bureau'));
+    assert.ok(!f.calls.some((c) => c.startsWith('osascript')));
+    assert.equal((await vm.stop(p)).state, 'down');
+  });
+  await t('autorisation refusée : message clair', async () => {
+    const f = fakeMac({ wgQuick: true, denied: true });
+    const vm = new VpnManager({ dataDir, readConfig, platform: 'darwin', run: f.run, exists: f.exists, waitMs: 500 });
+    await assert.rejects(vm.start(profile()), /refusée/);
+  });
+  await t('wg-quick absent : indique brew install wireguard-tools', async () => {
+    const f = fakeMac({});
+    const vm = new VpnManager({ dataDir, readConfig, platform: 'darwin', run: f.run, exists: f.exists, waitMs: 500 });
+    await assert.rejects(vm.start(profile()), /brew install wireguard-tools/);
   });
 
   fs.rmSync(dataDir, { recursive: true, force: true });

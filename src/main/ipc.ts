@@ -137,7 +137,8 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
   });
   handle('vpn:save', async (p: VpnProfile, source?: { configPath?: string; configText?: string }) => {
     if (!p.name.trim()) throw new Error('Donne un nom au profil VPN.');
-    if (!TUNNEL_NAME_RE.test(p.tunnelName))
+    const macApp = process.platform === 'darwin' && p.mode === 'existing' && p.tunnelName.trim().length > 0 && !/["\n]/.test(p.tunnelName);
+    if (!macApp && !TUNNEL_NAME_RE.test(p.tunnelName))
       throw new Error('Nom du tunnel invalide : 15 caractères max, lettres, chiffres et _ = + . - uniquement.');
     let config: string | undefined;
     if (source?.configPath) config = fs.readFileSync(source.configPath, 'utf8');
@@ -510,6 +511,13 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
       app.relaunch({ execPath: target, args: process.argv.slice(1) });
       setTimeout(() => app.exit(0), 300);
       return 'relaunch';
+    }
+    if (kind === 'mac') {
+      // ouvre l'image disque : glisser KSDB Studio dans Applications pour remplacer l'ancienne version
+      const err = await shell.openPath(file);
+      if (err) throw new Error(err);
+      setTimeout(() => app.quit(), 1500);
+      return 'dmg';
     }
     shell.showItemInFolder(file);
     return 'manual';

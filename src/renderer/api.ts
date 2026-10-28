@@ -102,7 +102,7 @@ export const api = {
   lastUpdate: () => call<UpdateInfo | null>('app:lastUpdate'),
   downloadUpdate: () => call<string>('app:downloadUpdate'),
   cancelDownload: () => call<void>('app:cancelDownload'),
-  installUpdate: (file: string) => call<'started' | 'relaunch' | 'manual'>('app:installUpdate', file),
+  installUpdate: (file: string) => call<'started' | 'relaunch' | 'dmg' | 'manual'>('app:installUpdate', file),
 
   listConnections: () => call<ListedConnection[]>('conn:list'),
   saveConnection: (c: ConnectionConfig) => call<string>('conn:save', c),

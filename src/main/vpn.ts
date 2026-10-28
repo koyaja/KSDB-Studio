@@ -63,6 +63,12 @@ export function parseWgConfig(text: string): { ok: boolean; endpoint?: string; e
 }
 
 const psQuote = (s: string) => "'" + s.replace(/'/g, "''") + "'";
+/** Guillemets pour sh (macOS : do shell script) */
+const shQuote = (s: string) => "'" + s.replace(/'/g, `'\\''`) + "'";
+/** Chaîne AppleScript */
+const asQuote = (s: string) => '"' + s.replace(/\\/g, '\\\\').replace(/"/g, '\\"') + '"';
+/** Les applications lancées depuis le Finder ont un PATH minimal : wg-quick a besoin du bash de Homebrew. */
+const MAC_PATH = '/opt/homebrew/bin:/usr/local/bin:/usr/bin:/bin:/usr/sbin:/sbin';
 
 export class VpnManager {
   private owned = new Set<string>();
@@ -164,6 +170,16 @@ export class VpnManager {
           backend: 'none',
           detail: 'Ni NetworkManager ni wg-quick trouvés. Installe : sudo apt install wireguard-tools',
         };
+    } else if (this.platform === 'darwin') {
+      const wq = this.macWgQuick();
+      info = wq
+        ? { platform: 'darwin', available: true, backend: 'wg-quick', detail: `${wq} (autorisation administrateur macOS) ; tunnels de l’application WireGuard via scutil` }
+        : {
+            platform: 'darwin',
+            available: true,
+            backend: 'wg-quick',
+            detail: 'wg-quick introuvable : seuls les tunnels de l’application WireGuard (mode « tunnel existant ») sont utilisables. Pour un fichier .conf : brew install wireguard-tools',
+          };
     } else {
       info = { platform: this.platform, available: false, backend: 'none', detail: 'Système non pris en charge pour le VPN' };
     }
@@ -185,6 +201,17 @@ export class VpnManager {
       if (this.platform === 'linux') {
         const r = await this.run('ip', ['-o', 'link', 'show', 'dev', p.tunnelName], { timeoutMs: 5000 });
         return { ...base, state: r.code === 0 ? 'up' : 'down' };
+      }
+      if (this.platform === 'darwin') {
+        if (p.mode === 'existing' && (await this.macNcNames()).includes(p.tunnelName)) {
+          const r = await this.run('scutil', ['--nc', 'status', p.tunnelName], { timeoutMs: 8000 });
+          const first = r.stdout.split('\n')[0]?.trim() ?? '';
+          if (first === 'Connected') return { ...base, state: 'up' };
+          if (/Connecting/i.test(first)) return { ...base, state: 'down', detail: 'connexion…' };
+          return { ...base, state: 'down' };
+        }
+        // wg-quick (macOS) enregistre l'interface utun associée dans /var/run/wireguard/<nom>.name
+        return { ...base, state: this.exists(`/var/run/wireguard/${p.tunnelName}.name`) ? 'up' : 'down' };
       }
       return { ...base, state: 'unknown' };
     } catch (e) {
@@ -340,13 +367,67 @@ export class VpnManager {
     await this.must('pkexec', ['wg-quick', 'down', target], 'wg-quick down');
   }
 
+  // ---------------- macOS ----------------
+
+  private macWgQuick(): string | null {
+    return ['/opt/homebrew/bin/wg-quick', '/usr/local/bin/wg-quick'].find((c) => this.exists(c)) ?? null;
+  }
+
+  /** Tunnels de l'application WireGuard (et autres VPN système) connus de macOS. */
+  private async macNcNames(): Promise<string[]> {
+    const r = await this.run('scutil', ['--nc', 'list'], { timeoutMs: 8000 });
+    if (r.code !== 0) return [];
+    return [...r.stdout.matchAll(/"([^"]+)"\s+\[VPN/g)].map((m) => m[1]);
+  }
+
+  /** Exécute une commande en administrateur (fenêtre d'autorisation macOS). */
+  private async macAdmin(cmd: string, what: string) {
+    const script = `do shell script ${asQuote(`export PATH=${MAC_PATH}; ${cmd}`)} with administrator privileges`;
+    const r = await this.run('osascript', ['-e', script], { timeoutMs: 180000 });
+    if (r.code !== 0) {
+      const msg = (r.stderr || r.stdout).trim();
+      if (/-128|User cancel|annulé/i.test(msg)) throw new Error('Autorisation administrateur refusée : le VPN n’a pas été modifié.');
+      throw new Error(`${what} : ${msg.replace(/^\d+:\d+: execution error: /, '') || `code ${r.code}`}`);
+    }
+  }
+
+  private async macStart(p: VpnProfile) {
+    if (p.mode === 'existing' && (await this.macNcNames()).includes(p.tunnelName)) {
+      await this.must('scutil', ['--nc', 'start', p.tunnelName], 'Démarrage du tunnel');
+      return;
+    }
+    const wq = this.macWgQuick();
+    if (!wq)
+      throw new Error(
+        p.mode === 'existing'
+          ? `Tunnel « ${p.tunnelName} » introuvable dans l’application WireGuard, et wg-quick n’est pas installé (brew install wireguard-tools).`
+          : 'wg-quick introuvable. Installe les outils WireGuard : brew install wireguard-tools',
+      );
+    const target = p.mode === 'file' ? this.writeConfFile(p) : p.tunnelName;
+    await this.macAdmin(`${shQuote(wq)} up ${shQuote(target)}`, 'wg-quick up');
+  }
+
+  private async macStop(p: VpnProfile) {
+    if (p.mode === 'existing' && (await this.macNcNames()).includes(p.tunnelName)) {
+      await this.must('scutil', ['--nc', 'stop', p.tunnelName], 'Arrêt du tunnel');
+      return;
+    }
+    const wq = this.macWgQuick() ?? 'wg-quick';
+    const file = path.join(this.vpnDir(), `${p.tunnelName}.conf`);
+    const target = p.mode === 'file' && this.exists(file) ? file : p.tunnelName;
+    await this.macAdmin(`${shQuote(wq)} down ${shQuote(target)}`, 'wg-quick down');
+  }
+
   // ---------------- API ----------------
 
   async start(p: VpnProfile): Promise<VpnStatus> {
-    if (!TUNNEL_NAME_RE.test(p.tunnelName)) throw new Error(`Nom de tunnel invalide : « ${p.tunnelName} » (15 caractères max, lettres, chiffres, _ = + . -)`);
+    // macOS : les tunnels de l'application WireGuard peuvent avoir n'importe quel nom (pilotés par scutil)
+    const free = this.platform === 'darwin' && p.mode === 'existing' && (await this.macNcNames()).includes(p.tunnelName);
+    if (!free && !TUNNEL_NAME_RE.test(p.tunnelName)) throw new Error(`Nom de tunnel invalide : « ${p.tunnelName} » (15 caractères max, lettres, chiffres, _ = + . -)`);
     if ((await this.status(p)).state === 'up') return this.status(p);
     if (this.platform === 'win32') await this.winStart(p);
     else if (this.platform === 'linux') await this.linuxStart(p);
+    else if (this.platform === 'darwin') await this.macStart(p);
     else throw new Error('Système non pris en charge pour le VPN');
     this.owned.add(p.id);
     if (!(await this.waitUp(p))) throw new Error(`Le tunnel « ${p.tunnelName} » ne s’est pas activé dans le délai imparti.`);
@@ -360,8 +441,9 @@ export class VpnManager {
     }
     if (this.platform === 'win32') await this.winStop(p);
     else if (this.platform === 'linux') await this.linuxStop(p);
+    else if (this.platform === 'darwin') await this.macStop(p);
     this.owned.delete(p.id);
-    if (p.mode === 'file' && this.platform === 'linux') this.removeConfFile(p);
+    if (p.mode === 'file' && this.platform !== 'win32') this.removeConfFile(p);
     return this.status(p);
   }
 

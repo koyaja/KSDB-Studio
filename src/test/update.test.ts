@@ -47,12 +47,17 @@ async function main() {
     assert.equal(installKind('win32', {}), 'windows');
     assert.equal(installKind('linux', { APPIMAGE: '/opt/x.AppImage' }), 'appimage');
     assert.equal(installKind('linux', {}), 'deb');
+    assert.equal(installKind('darwin', {}), 'mac');
   });
   await t('choix du bon fichier selon le système', () => {
     assert.equal(pickAsset(assets, 'windows')!.name, 'KSDB-Studio-Setup-1.4.0.exe');
     assert.equal(pickAsset(assets, 'appimage')!.name, 'KSDB-Studio-1.4.0-linux-x86_64.AppImage');
     assert.equal(pickAsset(assets, 'deb')!.name, 'KSDB-Studio-1.4.0-linux-amd64.deb');
     assert.equal(pickAsset([], 'deb'), undefined);
+    const mac = [{ name: 'KSDB-Studio-1.4.0-mac-x64.dmg', browser_download_url: 'x', size: 1 }, { name: 'KSDB-Studio-1.4.0-mac-arm64.dmg', browser_download_url: 'a', size: 1 }];
+    assert.equal(pickAsset([...assets, ...mac], 'mac', 'arm64')!.name, 'KSDB-Studio-1.4.0-mac-arm64.dmg');
+    assert.equal(pickAsset([...assets, ...mac], 'mac', 'x64')!.name, 'KSDB-Studio-1.4.0-mac-x64.dmg');
+    assert.equal(pickAsset(assets, 'mac', 'arm64'), undefined);
   });
   await t('nouvelle version détectée', () => {
     const u = toUpdateInfo(release, '1.3.0', 'deb');

@@ -1,8 +1,8 @@
 name: Build KSDB Studio
 
 # Publication automatique : un push sur main dont la version de package.json n'a pas encore
-# de tag crée le tag vX.Y.Z et la release (notes tirées de CHANGELOG.md), puis Windows et
-# Linux sont compilés et joints à la release.
+# de tag crée le tag vX.Y.Z et la release (notes tirées de CHANGELOG.md), puis Windows,
+# Linux et macOS (Apple Silicon + Intel) sont compilés et joints à la release.
 on:
   push:
     branches: [main]
@@ -81,6 +81,8 @@ jobs:
             target: dist:win
           - os: ubuntu-latest
             target: dist:linux
+          - os: macos-latest
+            target: dist:mac
     runs-on: ${{ matrix.os }}
     env:
       TAG: ${{ needs.version.outputs.tag }}
@@ -106,6 +108,7 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
+            release/*.dmg
       - name: Joindre à la release
         if: env.TAG != ''
         uses: softprops/action-gh-release@v2
@@ -115,3 +118,4 @@ jobs:
             release/*.exe
             release/*.AppImage
             release/*.deb
+            release/*.dmg

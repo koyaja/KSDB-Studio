@@ -17,7 +17,8 @@
     "test:vpn": "node scripts/build-main.mjs && node dist/test/vpn.test.js",
     "test:update": "node scripts/build-main.mjs && node dist/test/update.test.js",
     "test:compare": "node scripts/build-main.mjs && node dist/test/compare.test.js",
-    "test:transfer": "node scripts/build-main.mjs && node dist/test/transfer.test.js"
+    "test:transfer": "node scripts/build-main.mjs && node dist/test/transfer.test.js",
+    "dist:mac": "npm run build && electron-builder --mac"
   },
   "author": {
     "name": "CYBERISK",
@@ -115,6 +116,27 @@
     "publish": null,
     "portable": {
       "artifactName": "KSDB-Studio-${version}-portable.${ext}"
+    },
+    "mac": {
+      "target": [
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
+      ],
+      "category": "public.app-category.developer-tools",
+      "icon": "build/icon.png",
+      "identity": "-",
+      "hardenedRuntime": false,
+      "gatekeeperAssess": false,
+      "darkModeSupport": true
+    },
+    "dmg": {
+      "title": "KSDB Studio ${version}",
+      "artifactName": "KSDB-Studio-${version}-mac-${arch}.${ext}"
     }
   },
   "homepage": "https://github.com/koyaja/KSDB-Studio",

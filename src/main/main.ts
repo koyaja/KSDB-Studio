@@ -38,7 +38,21 @@ function createWindow() {
 app.whenReady().then(() => {
   Menu.setApplicationMenu(
     Menu.buildFromTemplate([
-      { label: 'Fichier', submenu: [{ role: 'quit', label: 'Quitter' }] },
+      // macOS : le premier menu porte le nom de l'application (À propos, Masquer, Quitter ⌘Q)
+      process.platform === 'darwin'
+        ? {
+            label: app.name,
+            submenu: [
+              { role: 'about', label: 'À propos de KSDB Studio' },
+              { type: 'separator' },
+              { role: 'hide', label: 'Masquer KSDB Studio' },
+              { role: 'hideOthers', label: 'Masquer les autres' },
+              { role: 'unhide', label: 'Tout afficher' },
+              { type: 'separator' },
+              { role: 'quit', label: 'Quitter KSDB Studio' },
+            ],
+          }
+        : { label: 'Fichier', submenu: [{ role: 'quit', label: 'Quitter' }] },
       {
         label: 'Édition',
         submenu: [
@@ -63,6 +77,9 @@ app.whenReady().then(() => {
           { role: 'togglefullscreen', label: 'Plein écran' },
         ],
       },
+      ...(process.platform === 'darwin'
+        ? [{ role: 'windowMenu' as const, label: 'Fenêtre' }]
+        : []),
     ]),
   );
   const store = new Store();

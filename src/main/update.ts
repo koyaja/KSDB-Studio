@@ -17,11 +17,12 @@ export function compareVersions(a: string, b: string): number {
   return 0;
 }
 
-export type InstallKind = 'windows' | 'appimage' | 'deb' | 'other';
+export type InstallKind = 'windows' | 'appimage' | 'deb' | 'mac' | 'other';
 
 export function installKind(platform = process.platform, env = process.env): InstallKind {
   if (platform === 'win32') return 'windows';
   if (platform === 'linux') return env.APPIMAGE ? 'appimage' : 'deb';
+  if (platform === 'darwin') return 'mac';
   return 'other';
 }
 
@@ -42,11 +43,12 @@ interface GhRelease {
   assets: GhAsset[];
 }
 
-export function pickAsset(assets: GhAsset[], kind: InstallKind): GhAsset | undefined {
+export function pickAsset(assets: GhAsset[], kind: InstallKind, arch: string = process.arch): GhAsset | undefined {
   const by = (re: RegExp) => assets.find((a) => re.test(a.name));
   if (kind === 'windows') return by(/setup.*\.exe$/i) ?? by(/\.exe$/i);
   if (kind === 'appimage') return by(/\.AppImage$/i);
   if (kind === 'deb') return by(/amd64\.deb$/i) ?? by(/\.deb$/i);
+  if (kind === 'mac') return by(arch === 'arm64' ? /mac-arm64\.dmg$/i : /mac-x64\.dmg$/i) ?? by(/universal\.dmg$/i);
   return undefined;
 }
 

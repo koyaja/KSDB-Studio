@@ -42,6 +42,19 @@ function candidateDirs(name: ToolName): string[] {
     }
   } else {
     if (pgTool) glob('/usr/lib/postgresql', /^\d+/, 'bin');
+    if (process.platform === 'darwin') {
+      // Homebrew (Apple Silicon : /opt/homebrew, Intel : /usr/local), Postgres.app, MySQL / MariaDB officiels
+      for (const brew of ['/opt/homebrew/opt', '/usr/local/opt']) {
+        if (pgTool) {
+          glob(brew, /^postgresql(@\d+)?$/, 'bin');
+          dirs.push(path.join(brew, 'libpq', 'bin'));
+        } else {
+          glob(brew, /^(mysql|mariadb)(-client)?(@[\d.]+)?$/, 'bin');
+        }
+      }
+      if (pgTool) glob('/Applications/Postgres.app/Contents/Versions', /^\d+/, 'bin');
+      else glob('/usr/local', /^mysql-/, 'bin');
+    }
     dirs.push('/usr/bin', '/usr/local/bin', '/opt/homebrew/bin', '/usr/local/mysql/bin');
   }
   return dirs.sort((a, b) => versionKey(b) - versionKey(a));

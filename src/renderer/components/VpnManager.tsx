@@ -177,6 +177,8 @@ export function VpnManager() {
       <p className="hint" style={{ marginTop: 14 }}>
         {window.ksdb.platform === 'win32'
           ? 'Windows demande une autorisation administrateur (UAC) à chaque démarrage ou arrêt d’un tunnel : c’est le service WireGuard qui crée la carte réseau.'
+          : window.ksdb.platform === 'darwin'
+          ? 'Les tunnels de l’application WireGuard (App Store) démarrent sans mot de passe. Un fichier .conf utilise wg-quick (brew install wireguard-tools) et macOS demande ton mot de passe.'
           : 'Avec NetworkManager, aucun mot de passe n’est demandé. Sans lui, wg-quick est lancé via pkexec et demande ton mot de passe.'}
       </p>
     </Modal>
@@ -185,6 +187,7 @@ export function VpnManager() {
 
 function VpnEditor({ profile, backend, onDone }: { profile: VpnProfile | null; backend: VpnBackendInfo | null; onDone: () => void }) {
   const isWin = window.ksdb.platform === 'win32';
+  const isMac = window.ksdb.platform === 'darwin';
   const [p, setP] = useState<VpnProfile>(
     profile ?? { id: '', name: '', mode: 'file', tunnelName: '', autoStart: true, stopOnQuit: false },
   );
@@ -253,7 +256,7 @@ function VpnEditor({ profile, backend, onDone }: { profile: VpnProfile | null; b
               Importer un fichier .conf
             </button>
             <button className={p.mode === 'existing' ? 'active' : ''} onClick={() => set({ mode: 'existing' })}>
-              {isWin ? 'Tunnel déjà dans l’application WireGuard' : 'Tunnel déjà configuré sur ce PC'}
+              {isWin || isMac ? 'Tunnel déjà dans l’application WireGuard' : 'Tunnel déjà configuré sur ce PC'}
             </button>
           </div>
         </Field>
@@ -301,11 +304,13 @@ function VpnEditor({ profile, backend, onDone }: { profile: VpnProfile | null; b
           />
         </Field>
         <Field
-          label={p.mode === 'existing' ? (isWin ? 'Nom du tunnel dans WireGuard' : 'Nom de la connexion / interface') : 'Nom du tunnel'}
+          label={p.mode === 'existing' ? (isWin || isMac ? 'Nom du tunnel dans WireGuard' : 'Nom de la connexion / interface') : 'Nom du tunnel'}
           hint={
             p.mode === 'existing'
               ? isWin
                 ? 'Exactement comme affiché dans la liste de l’application WireGuard'
+                : isMac
+                ? 'Exactement comme affiché dans l’application WireGuard (ou un fichier <nom>.conf de wg-quick)'
                 : 'Nom dans NetworkManager (nmcli connection) ou fichier /etc/wireguard/<nom>.conf'
               : '15 caractères max : lettres, chiffres, _ = + . -'
           }

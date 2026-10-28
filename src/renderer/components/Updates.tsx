@@ -111,6 +111,11 @@ export function UpdateDialog() {
               Installer maintenant
             </button>
           )}
+          {dl.state === 'done' && kind === 'mac' && (
+            <button className="btn primary" onClick={install}>
+              Ouvrir et quitter
+            </button>
+          )}
           {dl.state === 'done' && kind === 'appimage' && (
             <button className="btn primary" onClick={install}>
               Remplacer et redémarrer
@@ -151,6 +156,7 @@ export function UpdateDialog() {
           <CheckCircle2 style={{ width: 14, height: 14, verticalAlign: -2 }} /> Téléchargé : {dl.file}
           {kind === 'windows' && '\nL’installateur va s’ouvrir et KSDB Studio se fermera. Tes connexions et réglages sont conservés.'}
           {kind === 'appimage' && '\nL’AppImage actuelle sera remplacée puis KSDB Studio redémarrera.'}
+          {kind === 'mac' && '\nL’image disque va s’ouvrir et KSDB Studio se fermera : glisse KSDB Studio dans Applications et choisis « Remplacer ». Tes connexions et réglages sont conservés.'}
         </div>
       )}
       {dl.state === 'done' && kind === 'deb' && (

@@ -353,7 +353,7 @@ export interface UpdateInfo {
   url: string;
   publishedAt: string;
   asset: { name: string; url: string; size: number } | null;
-  installKind: 'windows' | 'appimage' | 'deb' | 'other';
+  installKind: 'windows' | 'appimage' | 'deb' | 'mac' | 'other';
 }
 
 export interface AppInfo {
@@ -363,7 +363,7 @@ export interface AppInfo {
   electron: string;
   chrome: string;
   node: string;
-  installKind: 'windows' | 'appimage' | 'deb' | 'other';
+  installKind: 'windows' | 'appimage' | 'deb' | 'mac' | 'other';
   dataDir: string;
   releasesUrl: string;
 }
