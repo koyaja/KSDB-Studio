@@ -1,13 +1,16 @@
 name: Build KSDB Studio
 
+# Publication automatique : un push sur main dont la version de package.json n'a pas encore
+# de tag crée le tag vX.Y.Z et la release (notes tirées de CHANGELOG.md), puis Windows et
+# Linux sont compilés et joints à la release.
 on:
-  # Publier une release sur GitHub (avec un nouveau tag vX.Y.Z) suffit :
-  # Windows et Linux sont compilés puis joints automatiquement.
+  push:
+    branches: [main]
+    tags: ['v*']
+  # release publiée à la main depuis GitHub
   release:
     types: [published]
-  push:
-    tags: ['v*']
-  # Recompiler et (re)joindre les fichiers à une release existante : Actions → Run workflow → tag
+  # recompiler et compléter une release existante : Actions → Run workflow → tag
   workflow_dispatch:
     inputs:
       tag:
@@ -18,8 +21,58 @@ on:
 permissions:
   contents: write
 
+concurrency:
+  group: build-${{ github.ref }}
+  cancel-in-progress: false
+
 jobs:
+  version:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: tag
+        name: Déterminer la release à alimenter
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+          EVENT: ${{ github.event_name }}
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+          INPUT_TAG: ${{ inputs.tag }}
+        run: |
+          set -euo pipefail
+          TAG=""
+          if [ "$EVENT" = "release" ]; then
+            TAG="$RELEASE_TAG"
+          elif [ "$EVENT" = "workflow_dispatch" ]; then
+            TAG="$INPUT_TAG"
+          elif [[ "$GITHUB_REF" == refs/tags/* ]]; then
+            TAG="$GITHUB_REF_NAME"
+          elif [ "$GITHUB_REF" = "refs/heads/main" ]; then
+            V=$(node -p "require('./package.json').version")
+            if gh release view "v$V" >/dev/null 2>&1 || git ls-remote --exit-code --tags origin "refs/tags/v$V" >/dev/null 2>&1; then
+              echo "v$V existe déjà : simple compilation de vérification."
+            else
+              # notes : section « ## [X.Y.Z] » de CHANGELOG.md, sinon notes générées
+              awk -v v="$V" '
+                $0 ~ "^## \\[?" v "\\]?" { on=1; next }
+                on && /^## / { exit }
+                on { print }
+              ' CHANGELOG.md > notes.md 2>/dev/null || true
+              if [ -s notes.md ]; then
+                gh release create "v$V" --target "$GITHUB_SHA" --title "KSDB Studio $V" --notes-file notes.md
+              else
+                gh release create "v$V" --target "$GITHUB_SHA" --title "KSDB Studio $V" --generate-notes
+              fi
+              echo "Release v$V créée."
+              TAG="v$V"
+            fi
+          fi
+          echo "tag=$TAG" >> "$GITHUB_OUTPUT"
+
   build:
+    needs: version
     strategy:
       fail-fast: false
       matrix:
@@ -30,7 +83,7 @@ jobs:
             target: dist:linux
     runs-on: ${{ matrix.os }}
     env:
-      TAG: ${{ github.event.release.tag_name || inputs.tag || (startsWith(github.ref, 'refs/tags/') && github.ref_name) || '' }}
+      TAG: ${{ needs.version.outputs.tag }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

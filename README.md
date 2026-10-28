@@ -89,9 +89,11 @@ Windows demande une autorisation administrateur (UAC) à chaque démarrage ou ar
 
 ## Publier une version
 
-1. Sur GitHub : **Releases → Draft a new release**, nouveau tag `vX.Y.Z`, cible `main`, notes de version en markdown, **Publish release**.
-2. GitHub Actions aligne la version de l’application sur le tag, compile Windows et Linux et joint les fichiers à la release (10 à 15 min). Les installations existantes sont prévenues automatiquement.
-3. Si une compilation a échoué : **Actions → Build KSDB Studio → Run workflow**, renseigner le tag de la release à compléter.
+1. Ajouter une section `## [X.Y.Z]` en tête de `CHANGELOG.md` (elle devient les notes de la release).
+2. Passer `version` à `X.Y.Z` dans `package.json` et pousser sur `main`.
+3. GitHub Actions crée le tag `vX.Y.Z` et la release, compile Windows et Linux et joint les fichiers (10 à 15 min). Les installations existantes sont prévenues automatiquement.
+
+Un push sans changement de version ne publie rien (simple compilation de vérification). Pour compléter une release dont une compilation a échoué : **Actions → Build KSDB Studio → Run workflow** avec le tag.
 
 ## Développement
 
