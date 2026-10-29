@@ -15,6 +15,7 @@ export type Tab =
   | { id: string; kind: 'erd'; connectionId: string; database: string; schema: string }
   | { id: string; kind: 'compare'; source: CompareSide; target: CompareSide }
   | { id: string; kind: 'transfer'; source: CompareSide; target: CompareSide; tables?: string[] }
+  | { id: string; kind: 'users'; connectionId: string; database: string }
   | { id: string; kind: 'history' }
   | { id: string; kind: 'settings' };
 

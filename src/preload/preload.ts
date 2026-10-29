@@ -1,6 +1,6 @@
 import { contextBridge, ipcRenderer, IpcRendererEvent } from 'electron';
 
-const ALLOWED = /^(app|conn|db|job|csv|history|vpn|group):/;
+const ALLOWED = /^(app|conn|db|job|csv|history|vpn|group|roles):/;
 
 contextBridge.exposeInMainWorld('ksdb', {
   invoke: (channel: string, ...args: unknown[]) => {

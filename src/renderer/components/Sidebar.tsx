@@ -42,6 +42,7 @@ import {
   bumpTree,
   confirmDialog,
   ensureConnected,
+  getState,
   newQueryTab,
   openTab,
   promptDialog,
@@ -138,6 +139,12 @@ function openCompare(connectionId: string, database: string, schema: string) {
     source: { connectionId, database, schema },
     target: { connectionId, database: '', schema: '' },
   });
+}
+
+export function openUsers(connectionId: string, database: string) {
+  const existing = getState().tabs.find((t) => t.kind === 'users' && t.connectionId === connectionId);
+  if (existing) return setState({ activeTab: existing.id });
+  openTab({ id: uid(), kind: 'users', connectionId, database });
 }
 
 export function openTransfer(connectionId: string, database: string, schema: string, tables?: string[]) {
@@ -323,6 +330,7 @@ function ConnectionNode({ conn }: { conn: ListedConnection }) {
         : { label: 'Se connecter', icon: <Plug />, onClick: toggle },
       ...vpnMenuItems(conn.effectiveVpnId),
       { label: 'Nouvelle requête', icon: <FileCode />, onClick: () => newQueryTab(conn.id) },
+      { label: 'Utilisateurs et droits', icon: <ShieldCheck />, onClick: async () => (await ensureConnected(conn.id)) && openUsers(conn.id, conn.database || (conn.kind === 'postgres' ? 'postgres' : '')) },
       { label: 'Processus du serveur', icon: <ServerCog />, onClick: async () => (await ensureConnected(conn.id)) && openTab({ id: uid(), kind: 'processes', connectionId: conn.id }) },
       { separator: true },
       {

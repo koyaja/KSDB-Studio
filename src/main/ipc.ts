@@ -30,6 +30,8 @@ import { friendlyError, PageOptions } from './drivers/base';
 import { encryptNavicat, parseNcx } from './navicat';
 import { dataDir, Store } from './store';
 import { checkForUpdate, download, installKind, RELEASES_URL } from './update';
+import { applyRoleScript, listRoles, roleDetail } from './roles';
+import { redactSecrets } from '../shared/roles';
 import { parseWgConfig, suggestTunnelName, TUNNEL_NAME_RE, VpnManager } from './vpn';
 import { dump, Job, restore, toolStatus } from './tools';
 import { runTransfer } from './transfer';
@@ -284,12 +286,32 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
       connectionId: id,
       connectionName: entry.cfg.name,
       database: db,
-      sql: sql.length > 20000 ? sql.slice(0, 20000) : sql,
+      sql: redactSecrets(sql.length > 20000 ? sql.slice(0, 20000) : sql),
       at: t0,
       durationMs: Date.now() - t0,
       ok: !results.some((r) => r.error),
     });
     return results;
+  });
+  // ---------- Utilisateurs et droits ----------
+  handle('roles:list', async (id: string, db: string) => listRoles(await cm.get(id), db));
+  handle('roles:detail', async (id: string, db: string, name: string, host: string) => roleDetail(await cm.get(id), db, name, host));
+  handle('roles:apply', async (id: string, db: string, statements: string[]) => {
+    const entry = await cm.entry(id);
+    if (entry.cfg.readOnly) throw new Error('Connexion en lecture seule : modification des comptes impossible.');
+    const t0 = Date.now();
+    const r = await applyRoleScript(entry.driver, db, statements);
+    store.addHistory({
+      id: crypto.randomUUID(),
+      connectionId: id,
+      connectionName: entry.cfg.name,
+      database: db,
+      sql: redactSecrets(statements.join('\n')),
+      at: t0,
+      durationMs: Date.now() - t0,
+      ok: !r.error,
+    });
+    return r;
   });
   handle('db:cancel', async (id: string, sessionId: string) => (await cm.get(id)).cancel(sessionId));
   handle('db:closeSession', async (id: string, sessionId: string) => {

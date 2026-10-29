@@ -24,6 +24,7 @@ const builds = [
   { ...common, entryPoints: ['src/test/update.test.ts'], outfile: 'dist/test/update.test.js' },
   { ...common, entryPoints: ['src/test/compare.test.ts'], outfile: 'dist/test/compare.test.js' },
   { ...common, entryPoints: ['src/test/transfer.test.ts'], outfile: 'dist/test/transfer.test.js' },
+  { ...common, entryPoints: ['src/test/roles.test.ts'], outfile: 'dist/test/roles.test.js' },
 ];
 
 if (watch) {

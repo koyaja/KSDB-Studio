@@ -3,6 +3,21 @@
 Chaque section `## [X.Y.Z]` devient automatiquement les notes de la release GitHub correspondante,
 affichées aussi dans la fenêtre de mise à jour de KSDB Studio.
 
+## [1.8.0]
+
+### Nouveautés
+- **Utilisateurs et droits** : clic droit sur une connexion → « Utilisateurs et droits »
+  - utilisateurs et rôles PostgreSQL, MySQL et MariaDB : création, renommage, suppression
+  - mot de passe généré, expiration (PG), limite de connexions, verrouillage (MySQL), attributs (superutilisateur, CREATEDB, CREATEROLE…)
+  - appartenance aux rôles ; rôle par défaut activé automatiquement sous MySQL / MariaDB
+  - grille des droits : bases, schémas, tables, vues, séquences, fonctions, droits serveur (*.*)
+  - modèles « Lecture seule », « Lecture / écriture », « Tous les droits », « Aucun droit » ; droits par défaut pour les objets futurs (PG)
+  - aperçu du script, application en transaction sous PostgreSQL
+  - suppression d’un rôle PostgreSQL avec réattribution ou suppression de ses objets
+
+### Sécurité
+- Les mots de passe (`PASSWORD '…'`, `IDENTIFIED BY '…'`) sont masqués dans l’historique des requêtes
+
 ## [1.7.0]
 
 ### Nouveautés

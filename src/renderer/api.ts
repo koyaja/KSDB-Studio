@@ -1,5 +1,6 @@
 // Accès typé au process principal.
 import type { SchemaSnapshot } from '../shared/schemadiff';
+import type { Flavor, RoleDetail, RoleInfo } from '../shared/roles';
 import type {
   TransferOptions,
   ApiResult,
@@ -166,6 +167,9 @@ export const api = {
   dump: (o: DumpOptions) => call<string>('job:dump', o),
   restore: (o: RestoreOptions) => call<string>('job:restore', o),
   transfer: (o: TransferOptions) => call<string>('job:transfer', o),
+  rolesList: (id: string, db: string) => call<{ flavor: Flavor; roles: RoleInfo[]; currentUser: string }>('roles:list', id, db),
+  roleDetail: (id: string, db: string, name: string, host: string) => call<RoleDetail>('roles:detail', id, db, name, host),
+  rolesApply: (id: string, db: string, statements: string[]) => call<{ done: number; error?: string; statement?: string }>('roles:apply', id, db, statements),
   cancelJob: (jobId: string) => call<void>('job:cancel', jobId),
 };
 

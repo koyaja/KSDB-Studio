@@ -59,6 +59,7 @@ chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
 | Diagramme ERD | Diagramme automatique d’un schéma (tables, colonnes, PK/FK, nombre de lignes, relations en pattes de corbeau) ; zoom, déplacement, tables repositionnables (positions mémorisées) ; clic pour mettre en évidence les relations ; recherche ; affichage complet / clés / noms ; requête avec jointures générée ; export **PNG** et **SVG** |
 | Comparaison de schémas | Source ↔ cible (bases, schémas, connexions différentes, ex. dev → prod) : tables, colonnes, clés primaires, index, contraintes UNIQUE, clés étrangères, commentaires, vues, vues matérialisées, fonctions, procédures, triggers ; détail des différences et avertissements (perte de données, NOT NULL…) ; **script de migration** ordonné (FK, vues dépendantes supprimées puis recréées dans l’ordre) ; suppressions décochées par défaut ; ouvrir dans l’éditeur, enregistrer en .sql ou **appliquer sur la cible** (transaction sous PostgreSQL) |
 | Transfert de données | Copie de tables entre bases, schémas ou **serveurs différents**, y compris **PostgreSQL ↔ MySQL/MariaDB** (tunnels SSH et VPN compris) : lecture en flux, insertion par lots, ordre des clés étrangères ; création ou recréation des tables (même moteur), vidage préalable, filtre WHERE par table, doublons ignorés, séquences recalées ; une transaction par table, progression en direct et arrêt possible |
+| Utilisateurs et droits | Utilisateurs et rôles PostgreSQL, MySQL, MariaDB : création, mot de passe généré, expiration, limite de connexions, verrouillage, attributs (superutilisateur, CREATEDB…), appartenance aux rôles ; **grille des droits** par base, schéma, table, vue, séquence, routine et droits serveur (*.*), modèles « lecture seule », « lecture / écriture », droits par défaut pour les objets futurs ; aperçu du SQL (mots de passe masqués), application en transaction (PG), suppression avec réattribution des objets |
 | Import / export | Export de table complète en CSV, TSV, JSON, SQL INSERT ; export des résultats ; **import CSV** (séparateur détecté, encodage, correspondance des colonnes, transaction unique) |
 | Sauvegarde | **Dump / restauration** via pg_dump, pg_restore, psql, mysqldump, mysql (détectés automatiquement), y compris à travers un tunnel SSH ou un VPN |
 | Serveur | Sessions actives, annulation de requête, fin de session |
@@ -72,6 +73,8 @@ chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
 | ![Diagramme ERD](docs/screenshots/erd.png) | ![Diagramme ERD, relations en évidence](docs/screenshots/erd-selection.png) |
 | ![Comparaison de schémas](docs/screenshots/comparaison.png) | ![Application du script de synchronisation](docs/screenshots/comparaison-application.png) |
 | ![Transfert MariaDB → MariaDB avec création des tables](docs/screenshots/transfert.png) | ![Transfert PostgreSQL → MariaDB filtré](docs/screenshots/transfert-pg-mariadb.png) |
+| ![Utilisateur PostgreSQL](docs/screenshots/comptes.png) | ![Droits d’un rôle, modèle lecture seule](docs/screenshots/comptes-droits.png) |
+| ![Droits MariaDB : serveur, bases, tables](docs/screenshots/comptes-mariadb.png) | |
 
 ## Migrer depuis Navicat
 
@@ -99,6 +102,15 @@ chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
 6. **Transférer**. Chaque table est copiée dans sa propre transaction : une table en erreur reste dans son état d’origine.
 
 Entre moteurs, les valeurs sont converties : booléens, JSON, dates avec fuseau horaire (converties dans le fuseau de la connexion MySQL), binaires.
+
+## Gérer les utilisateurs et les droits
+
+1. Clic droit sur une connexion → **Utilisateurs et droits**.
+2. **+ Utilisateur** (compte qui se connecte) ou **+ Rôle** (groupe de droits). Un mot de passe solide est généré : copie-le avant de créer le compte.
+3. Onglet **Droits** : coche les cases, ou applique un modèle (**Lecture seule**, **Lecture / écriture**, **Tous les droits**, **Aucun droit**) à la base, au schéma ou à ses tables. Sous PostgreSQL, « + objets futurs » ajoute les droits par défaut pour les tables créées plus tard.
+4. Onglet **SQL** pour relire le script, puis **Appliquer**. Sous PostgreSQL, tout passe dans une transaction.
+
+Conseil : crée un rôle par profil (lecteurs, application, administrateurs), donne-lui les droits, puis rends les utilisateurs membres de ce rôle. Les mots de passe sont masqués dans l’aperçu et dans l’historique des requêtes.
 
 ## VPN WireGuard
 
@@ -138,6 +150,7 @@ npm run test:vpn     # pilotage WireGuard (commandes système simulées, Windows
 npm run test:update  # détection et téléchargement des mises à jour
 npm run test:compare # comparaison de schémas : diff → script appliqué → nouveau diff vide (PG + MariaDB)
 npm run test:transfer # transfert de données : PG → PG, MariaDB → MariaDB, PG ↔ MariaDB
+npm run test:roles   # comptes et droits : création, droits vérifiés en se connectant avec le compte (PG + MariaDB)
 npm run dist:linux   # AppImage + .deb dans release/
 npm run dist:win     # installateur Windows dans release/
 npm run dist:mac     # .dmg Apple Silicon + Intel dans release/ (sur un Mac)
@@ -157,6 +170,7 @@ src/
     connections.ts pools, sessions par onglet, tunnel SSH, démarrage du VPN
     tunnel.ts      ssh2 → port local
     vpn.ts         WireGuard : wireguard.exe (UAC) / nmcli / wg-quick / scutil (macOS)
+    roles.ts       lecture des comptes et des droits (pg_roles + aclexplode, SHOW GRANTS)
     transfer.ts    transfert de données entre connexions (flux, lots, ordre des FK)
     tools.ts       pg_dump / pg_restore / psql / mysqldump / mysql
     navicat.ts     import .ncx (AES-128-CBC Navicat 12+)
@@ -171,7 +185,6 @@ Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studi
 
 ## Feuille de route
 
-- Gestion des utilisateurs et des droits
 - Plan EXPLAIN visuel
 - Sauvegardes planifiées
 - SQL Server, SQLite, MongoDB

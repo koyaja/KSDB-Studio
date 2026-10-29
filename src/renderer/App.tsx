@@ -16,6 +16,7 @@ import {
   Network,
   GitCompareArrows,
   ArrowRightLeft,
+  ShieldCheck,
   Sun,
   Table2,
   Upload,
@@ -37,6 +38,7 @@ import { QueryTab } from './tabs/QueryTab';
 import { ErdTab } from './tabs/ErdTab';
 import { CompareTab } from './tabs/CompareTab';
 import { TransferTab } from './tabs/TransferTab';
+import { UsersTab } from './tabs/UsersTab';
 import { TableTab } from './tabs/TableTab';
 import {
   closeTab,
@@ -71,6 +73,8 @@ function tabTitle(t: Tab): string {
       return `Import → ${t.table}`;
     case 'processes':
       return `Processus · ${connectionById(t.connectionId)?.name ?? ''}`;
+    case 'users':
+      return `Comptes · ${connectionById(t.connectionId)?.name ?? ''}`;
     case 'transfer': {
       const d = (x: { database: string; schema: string }) => (x.schema !== x.database ? `${x.database}.${x.schema}` : x.database);
       return `Transfert ${t.source.database ? d(t.source) : ''}${t.target.database ? ' → ' + d(t.target) : ''}`;
@@ -101,6 +105,8 @@ function tabIcon(t: Tab) {
       return <FileInput {...p} />;
     case 'processes':
       return <Activity {...p} />;
+    case 'users':
+      return <ShieldCheck {...p} style={{ color: 'var(--accent)' }} />;
     case 'transfer':
       return <ArrowRightLeft {...p} style={{ color: 'var(--accent)' }} />;
     case 'compare':
@@ -357,6 +363,8 @@ export function App() {
                   return <ImportTab key={t.id} tab={t} active={active} />;
                 case 'compare':
                   return <CompareTab key={t.id} tab={t} active={active} />;
+                case 'users':
+                  return <UsersTab key={t.id} tab={t} active={active} />;
                 case 'transfer':
                   return <TransferTab key={t.id} tab={t} active={active} />;
                 case 'erd':
