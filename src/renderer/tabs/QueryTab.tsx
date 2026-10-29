@@ -13,6 +13,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { format as formatSql } from 'sql-formatter';
 import { isRisky, splitSql } from '../../shared/sqlsplit';
+import { isWriteStatement, parsePlan, Plan } from '../../shared/explain';
+import { PlanView } from '../components/PlanView';
 import type { ExportFormat, QueryResult } from '../../shared/types';
 import { api, Completion } from '../api';
 import { DataGrid } from '../components/DataGrid';
@@ -35,7 +37,8 @@ export function QueryTab({ tab, active }: { tab: QTab; active: boolean }) {
   const conn = connections.find((c) => c.id === tab.connectionId);
   const editor = useRef<SqlEditorHandle>(null);
   const [results, setResults] = useState<QueryResult[]>([]);
-  const [view, setView] = useState<number | 'messages'>('messages');
+  const [view, setView] = useState<number | 'messages' | 'plan'>('messages');
+  const [plan, setPlan] = useState<{ plan: Plan; rolledBack: boolean; sql: string } | null>(null);
   const [running, setRunning] = useState(false);
   const [elapsed, setElapsed] = useState(0);
   const [dbs, setDbs] = useState<string[]>([]);
@@ -148,14 +151,41 @@ export function QueryTab({ tab, active }: { tab: QTab; active: boolean }) {
     updateTab(tab.id, { sql: text, filePath: files[0], dirty: false, title: files[0].split(/[\\/]/).pop()!.replace(/\.sql$/i, '') });
   };
 
-  const explain = (analyze: boolean) =>
-    run('smart', (s) =>
-      conn?.kind === 'postgres'
-        ? `EXPLAIN (${analyze ? 'ANALYZE, BUFFERS, ' : ''}FORMAT TEXT) ${s}`
-        : analyze
-          ? `${conn?.flavor === 'mariadb' ? 'ANALYZE' : 'EXPLAIN ANALYZE'} ${s}`
-          : `EXPLAIN ${s}`,
-    );
+  const explain = async (analyze: boolean, sqlOverride?: string) => {
+    if (running) return;
+    if (!tab.connectionId || !conn) return toast('Choisis d’abord une connexion dans la barre d’outils.', 'error');
+    const raw = sqlOverride ?? editor.current!.smartText()?.text ?? '';
+    const sql = splitSql(raw, conn.kind)[0]?.text ?? raw;
+    if (!sql.trim()) return;
+    if (analyze && isWriteStatement(sql)) {
+      const ok = await confirmDialog(
+        'Mesurer une instruction qui modifie des données ?',
+        [
+          conn.production ? '⚠ Connexion de PRODUCTION.' : '',
+          'ANALYZE exécute réellement l’instruction, dans une transaction annulée ensuite (ROLLBACK).',
+          conn.kind === 'mysql' ? 'MySQL / MariaDB : les ordres de structure (CREATE, ALTER, DROP…) et les tables MyISAM ne peuvent pas être annulés.' : '',
+          'Les séquences / auto-incréments consommés ne reviennent pas en arrière.',
+        ]
+          .filter(Boolean)
+          .join('\n\n'),
+        { danger: true, confirmLabel: 'Mesurer' },
+      );
+      if (!ok) return;
+    }
+    if (!(await ensureConnected(conn.id))) return;
+    setRunning(true);
+    setElapsed(0);
+    try {
+      const out = await api.explain(conn.id, tab.id, tab.database, sql, analyze);
+      setPlan({ plan: parsePlan(out.format, out.engine, out.output), rolledBack: out.rolledBack, sql });
+      setView('plan');
+    } catch (e) {
+      setResults([{ statement: sql, fields: [], rows: [], rowCount: 0, durationMs: 0, error: (e as Error).message }]);
+      setView('messages');
+    } finally {
+      setRunning(false);
+    }
+  };
 
   const dragEditor = useDrag(
     (_dx, dy) => {
@@ -186,8 +216,8 @@ export function QueryTab({ tab, active }: { tab: QTab; active: boolean }) {
           title="Plan d’exécution (Ctrl+E)"
           onClick={(e) =>
             openMenu(e, [
-              { label: 'EXPLAIN', icon: <Gauge />, onClick: () => explain(false) },
-              { label: conn?.kind === 'postgres' ? 'EXPLAIN ANALYZE (exécute la requête)' : 'ANALYZE (exécute la requête)', icon: <Gauge />, onClick: () => explain(true) },
+              { label: 'Plan estimé (Ctrl+E)', icon: <Gauge />, onClick: () => explain(false) },
+              { label: 'Plan mesuré : exécute la requête (Ctrl+Maj+E)', icon: <Gauge />, onClick: () => explain(true) },
             ])
           }
         >
@@ -251,6 +281,7 @@ export function QueryTab({ tab, active }: { tab: QTab; active: boolean }) {
             onFormat={doFormat}
             onSave={() => save(false)}
             onExplain={() => explain(false)}
+            onExplainAnalyze={() => explain(true)}
           />
         </div>
         <div
@@ -268,6 +299,12 @@ export function QueryTab({ tab, active }: { tab: QTab; active: boolean }) {
                 <span className="count">{fmtInt(r.rowCount)}</span>
               </button>
             ))}
+            {plan && (
+              <button role="tab" className={view === 'plan' ? 'active' : ''} onClick={() => setView('plan')} title={plan.sql}>
+                <Gauge style={{ width: 14, height: 14 }} /> Plan
+                {plan.plan.warnings.some((w) => w.level === 'warn') && <span className="err-dot warn" />}
+              </button>
+            )}
             <button role="tab" className={view === 'messages' ? 'active' : ''} onClick={() => setView('messages')}>
               <ListChecks style={{ width: 14, height: 14 }} /> Messages
               {results.some((r) => r.error) && <span className="err-dot" />}
@@ -283,6 +320,7 @@ export function QueryTab({ tab, active }: { tab: QTab; active: boolean }) {
             </div>
           )}
           {!running && view === 'messages' && <Messages results={results} />}
+          {!running && view === 'plan' && plan && <PlanView plan={plan.plan} rolledBack={plan.rolledBack} onReExplain={(a) => explain(a, plan.sql)} />}
           {!running && current && (
             <>
               <DataGrid fields={current.fields} rows={current.rows} />

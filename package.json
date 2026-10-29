@@ -1,6 +1,6 @@
 {
   "name": "ksdb-studio",
-  "version": "1.8.0",
+  "version": "1.9.0",
   "description": "Gestionnaire de bases de données léger pour PostgreSQL et MySQL/MariaDB",
   "main": "dist/main/main.js",
   "scripts": {
@@ -19,7 +19,8 @@
     "test:compare": "node scripts/build-main.mjs && node dist/test/compare.test.js",
     "test:transfer": "node scripts/build-main.mjs && node dist/test/transfer.test.js",
     "dist:mac": "npm run build && electron-builder --mac",
-    "test:roles": "node scripts/build-main.mjs && node dist/test/roles.test.js"
+    "test:roles": "node scripts/build-main.mjs && node dist/test/roles.test.js",
+    "test:explain": "node scripts/build-main.mjs && node dist/test/explain.test.js"
   },
   "author": {
     "name": "CYBERISK",

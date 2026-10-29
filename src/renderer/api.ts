@@ -167,6 +167,8 @@ export const api = {
   dump: (o: DumpOptions) => call<string>('job:dump', o),
   restore: (o: RestoreOptions) => call<string>('job:restore', o),
   transfer: (o: TransferOptions) => call<string>('job:transfer', o),
+  explain: (id: string, sessionId: string, db: string, sql: string, analyze: boolean) =>
+    call<{ engine: 'postgres' | 'mysql' | 'mariadb'; format: 'pg-json' | 'my-json' | 'my-tree'; output: string; durationMs: number; rolledBack: boolean }>('db:explain', id, sessionId, db, sql, analyze),
   rolesList: (id: string, db: string) => call<{ flavor: Flavor; roles: RoleInfo[]; currentUser: string }>('roles:list', id, db),
   roleDetail: (id: string, db: string, name: string, host: string) => call<RoleDetail>('roles:detail', id, db, name, host),
   rolesApply: (id: string, db: string, statements: string[]) => call<{ done: number; error?: string; statement?: string }>('roles:apply', id, db, statements),

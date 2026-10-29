@@ -3,6 +3,16 @@
 Chaque section `## [X.Y.Z]` devient automatiquement les notes de la release GitHub correspondante,
 affichées aussi dans la fenêtre de mise à jour de KSDB Studio.
 
+## [1.9.0]
+
+### Nouveautés
+- **Plan d’exécution visuel** dans l’éditeur SQL : bouton « Plan », **Ctrl+E** (estimé) et **Ctrl+Maj+E** (mesuré)
+  - PostgreSQL, MariaDB et MySQL 8
+  - arbre des étapes : temps (ou coût) propre de chaque étape et part du total, lignes réelles / estimées avec l’écart, boucles, filtres et conditions
+  - vue graphique, panneau de détail, plan brut JSON / texte
+  - points d’attention expliqués : parcours complet avec l’index à créer, estimation fausse (ANALYZE conseillé), tri ou hachage sur disque (work_mem), boucles coûteuses, tris et tables temporaires MySQL
+  - ANALYZE exécuté dans une transaction annulée, avec confirmation pour les INSERT / UPDATE / DELETE
+
 ## [1.8.0]
 
 ### Nouveautés

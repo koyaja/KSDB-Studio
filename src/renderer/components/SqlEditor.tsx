@@ -47,6 +47,7 @@ interface Props {
   onFormat?: () => void;
   onSave?: () => void;
   onExplain?: () => void;
+  onExplainAnalyze?: () => void;
   readOnly?: boolean;
 }
 
@@ -158,13 +159,22 @@ export const SqlEditor = forwardRef<SqlEditorHandle, Props>(function SqlEditor(p
           highlightSelectionMatches(),
           search({ top: true }),
           placeholder('Écris ta requête ici.  Ctrl+Entrée : exécuter l’instruction courante · F5 : tout exécuter'),
+          // Ctrl+E : plan estimé ; Ctrl+Maj+E : plan mesuré (selon la touche physique, quelle que soit la disposition)
+          EditorView.domEventHandlers({
+            keydown: (e) => {
+              if (!(e.ctrlKey || e.metaKey) || e.altKey || e.code !== 'KeyE') return false;
+              e.preventDefault();
+              if (e.shiftKey) cb.current.onExplainAnalyze?.();
+              else cb.current.onExplain?.();
+              return true;
+            },
+          }),
           keymap.of([
             { key: 'Mod-Enter', run: run('smart'), preventDefault: true },
             { key: 'Shift-Mod-Enter', run: run('all'), preventDefault: true },
             { key: 'F5', run: run('all'), preventDefault: true },
             { key: 'Shift-Mod-f', run: () => (cb.current.onFormat?.(), true), preventDefault: true },
             { key: 'Mod-s', run: () => (cb.current.onSave?.(), true), preventDefault: true },
-            { key: 'Mod-e', run: () => (cb.current.onExplain?.(), true), preventDefault: true },
             ...closeBracketsKeymap,
             ...completionKeymap,
             ...searchKeymap,

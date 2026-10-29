@@ -60,6 +60,7 @@ chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
 | Comparaison de schémas | Source ↔ cible (bases, schémas, connexions différentes, ex. dev → prod) : tables, colonnes, clés primaires, index, contraintes UNIQUE, clés étrangères, commentaires, vues, vues matérialisées, fonctions, procédures, triggers ; détail des différences et avertissements (perte de données, NOT NULL…) ; **script de migration** ordonné (FK, vues dépendantes supprimées puis recréées dans l’ordre) ; suppressions décochées par défaut ; ouvrir dans l’éditeur, enregistrer en .sql ou **appliquer sur la cible** (transaction sous PostgreSQL) |
 | Transfert de données | Copie de tables entre bases, schémas ou **serveurs différents**, y compris **PostgreSQL ↔ MySQL/MariaDB** (tunnels SSH et VPN compris) : lecture en flux, insertion par lots, ordre des clés étrangères ; création ou recréation des tables (même moteur), vidage préalable, filtre WHERE par table, doublons ignorés, séquences recalées ; une transaction par table, progression en direct et arrêt possible |
 | Utilisateurs et droits | Utilisateurs et rôles PostgreSQL, MySQL, MariaDB : création, mot de passe généré, expiration, limite de connexions, verrouillage, attributs (superutilisateur, CREATEDB…), appartenance aux rôles ; **grille des droits** par base, schéma, table, vue, séquence, routine et droits serveur (*.*), modèles « lecture seule », « lecture / écriture », droits par défaut pour les objets futurs ; aperçu du SQL (mots de passe masqués), application en transaction (PG), suppression avec réattribution des objets |
+| Plan d’exécution | **Plan visuel** PostgreSQL (EXPLAIN JSON), MariaDB (ANALYZE FORMAT=JSON) et MySQL 8 (EXPLAIN ANALYZE) : arbre avec temps ou coût propre de chaque étape, lignes réelles / estimées et écart, vue graphique ; **points d’attention** expliqués (parcours complet avec index conseillé sur les colonnes du filtre, estimations fausses, tri ou hachage sur disque, boucles coûteuses) ; mesure réelle (ANALYZE) exécutée dans une transaction annulée |
 | Import / export | Export de table complète en CSV, TSV, JSON, SQL INSERT ; export des résultats ; **import CSV** (séparateur détecté, encodage, correspondance des colonnes, transaction unique) |
 | Sauvegarde | **Dump / restauration** via pg_dump, pg_restore, psql, mysqldump, mysql (détectés automatiquement), y compris à travers un tunnel SSH ou un VPN |
 | Serveur | Sessions actives, annulation de requête, fin de session |
@@ -74,7 +75,8 @@ chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
 | ![Comparaison de schémas](docs/screenshots/comparaison.png) | ![Application du script de synchronisation](docs/screenshots/comparaison-application.png) |
 | ![Transfert MariaDB → MariaDB avec création des tables](docs/screenshots/transfert.png) | ![Transfert PostgreSQL → MariaDB filtré](docs/screenshots/transfert-pg-mariadb.png) |
 | ![Utilisateur PostgreSQL](docs/screenshots/comptes.png) | ![Droits d’un rôle, modèle lecture seule](docs/screenshots/comptes-droits.png) |
-| ![Droits MariaDB : serveur, bases, tables](docs/screenshots/comptes-mariadb.png) | |
+| ![Droits MariaDB : serveur, bases, tables](docs/screenshots/comptes-mariadb.png) | ![Plan d’exécution mesuré, points d’attention](docs/screenshots/plan.png) |
+| ![Plan en graphique](docs/screenshots/plan-graphique.png) | ![Plan estimé MariaDB](docs/screenshots/plan-mariadb.png) |
 
 ## Migrer depuis Navicat
 
@@ -102,6 +104,14 @@ chmod +x KSDB-Studio-<version>-linux-x86_64.AppImage
 6. **Transférer**. Chaque table est copiée dans sa propre transaction : une table en erreur reste dans son état d’origine.
 
 Entre moteurs, les valeurs sont converties : booléens, JSON, dates avec fuseau horaire (converties dans le fuseau de la connexion MySQL), binaires.
+
+## Lire un plan d’exécution
+
+Dans l’éditeur SQL, place le curseur sur une requête puis :
+- **Ctrl+E** : plan estimé, sans exécuter la requête ;
+- **Ctrl+Maj+E** : plan mesuré (ANALYZE). La requête est exécutée dans une transaction annulée ensuite ; pour un INSERT / UPDATE / DELETE, une confirmation est demandée.
+
+L’onglet **Plan** montre où part le temps : chaque étape a sa barre (rouge au-delà de 50 % du total). Les **points d’attention** en haut indiquent quoi faire : index à créer (avec les colonnes), statistiques à mettre à jour (ANALYZE), work_mem trop petit… Clique sur une étape pour voir tous ses détails, ou passe en vue **Graphique**.
 
 ## Gérer les utilisateurs et les droits
 
@@ -150,6 +160,7 @@ npm run test:vpn     # pilotage WireGuard (commandes système simulées, Windows
 npm run test:update  # détection et téléchargement des mises à jour
 npm run test:compare # comparaison de schémas : diff → script appliqué → nouveau diff vide (PG + MariaDB)
 npm run test:transfer # transfert de données : PG → PG, MariaDB → MariaDB, PG ↔ MariaDB
+npm run test:explain # plans d’exécution : formats PG / MariaDB / MySQL 8, diagnostics, ANALYZE annulé
 npm run test:roles   # comptes et droits : création, droits vérifiés en se connectant avec le compte (PG + MariaDB)
 npm run dist:linux   # AppImage + .deb dans release/
 npm run dist:win     # installateur Windows dans release/
@@ -170,6 +181,7 @@ src/
     connections.ts pools, sessions par onglet, tunnel SSH, démarrage du VPN
     tunnel.ts      ssh2 → port local
     vpn.ts         WireGuard : wireguard.exe (UAC) / nmcli / wg-quick / scutil (macOS)
+    explain.ts     EXPLAIN dans une session dédiée (ANALYZE dans une transaction annulée)
     roles.ts       lecture des comptes et des droits (pg_roles + aclexplode, SHOW GRANTS)
     transfer.ts    transfert de données entre connexions (flux, lots, ordre des FK)
     tools.ts       pg_dump / pg_restore / psql / mysqldump / mysql
@@ -185,7 +197,6 @@ Données locales : `%APPDATA%\KSDB Studio\data` (Windows), `~/.config/KSDB Studi
 
 ## Feuille de route
 
-- Plan EXPLAIN visuel
 - Sauvegardes planifiées
 - SQL Server, SQLite, MongoDB
 

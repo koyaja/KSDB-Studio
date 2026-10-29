@@ -31,6 +31,7 @@ import { encryptNavicat, parseNcx } from './navicat';
 import { dataDir, Store } from './store';
 import { checkForUpdate, download, installKind, RELEASES_URL } from './update';
 import { applyRoleScript, listRoles, roleDetail } from './roles';
+import { runExplain } from './explain';
 import { redactSecrets } from '../shared/roles';
 import { parseWgConfig, suggestTunnelName, TUNNEL_NAME_RE, VpnManager } from './vpn';
 import { dump, Job, restore, toolStatus } from './tools';
@@ -293,6 +294,9 @@ export function registerIpc(store: Store, getWindow: () => BrowserWindow | null)
     });
     return results;
   });
+  handle('db:explain', async (id: string, sessionId: string, db: string, sql: string, analyze: boolean) =>
+    runExplain(await cm.get(id), sessionId, db, sql, analyze),
+  );
   // ---------- Utilisateurs et droits ----------
   handle('roles:list', async (id: string, db: string) => listRoles(await cm.get(id), db));
   handle('roles:detail', async (id: string, db: string, name: string, host: string) => roleDetail(await cm.get(id), db, name, host));
